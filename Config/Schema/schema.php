@@ -165,7 +165,7 @@ class EavSchema extends CakeSchema {
         'id' => array('type' => 'string', 'null' => false, 'default' => null, 'length' => 36, 'key' => 'primary', 'collate' => 'utf8_bin', 'charset' => 'utf8'),
         'entity_id' => array('type' => 'string', 'null' => false, 'default' => null, 'length' => 36, 'collate' => 'utf8_bin', 'charset' => 'utf8'),
         'attribute_id' => array('type' => 'string', 'null' => false, 'default' => null, 'length' => 36, 'collate' => 'utf8_bin', 'charset' => 'utf8'),
-        'value' => array('type' => 'timestamp', 'null' => true, 'default' => null),
+        'value' => array('type' => 'datetime', 'null' => true, 'default' => null),
         'created' => array('type' => 'datetime', 'null' => true, 'default' => null),
         'modified' => array('type' => 'datetime', 'null' => true, 'default' => null),
         'indexes' => array(

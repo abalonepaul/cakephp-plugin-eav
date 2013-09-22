@@ -255,7 +255,7 @@ CREATE TABLE `attributes_timestamp_values` (
   `id` char(36) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL,
   `entity_id` char(36) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL,
   `attribute_id` char(36) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL,
-  `value` timestamp NULL DEFAULT NULL,
+  `value` datetime NULL DEFAULT NULL,
   `created` datetime NOT NULL,
   `modified` datetime NOT NULL,
   PRIMARY KEY (`id`),
