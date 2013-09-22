@@ -1,6 +1,6 @@
 # CakePHP EAV Plugin
 
-The EAV Plugin is based on the EAV Behavior which contains logic to implement the Entity, Attribute, Value design pattern in CakePHP.\
+The EAV Plugin is based on the EAV Behavior which contains logic to implement the Entity, Attribute, Value design pattern in CakePHP.
 
 The Entity-Attribute-Value Design Pattern is a strategy for dynamically adding fields to Models. The pattern is
 often used to provide a solution for storing variable variable data. Some CRMs use this strategy in a SaaS
