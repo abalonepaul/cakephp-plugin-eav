@@ -22,7 +22,7 @@
  *
  * @package       plugins.Eav.Model.Behaviors
  */
-App::uses('Eav.Attribute','Eav.Model');
+App::uses('ProFields.Field','Eav.Model');
 
 class EavBehavior extends ModelBehavior {
 
@@ -38,7 +38,7 @@ class EavBehavior extends ModelBehavior {
      * The model acting as the Attribute Model
      * @var string
      */
-    public $attributeModel = 'Attribute';
+    public $attributeModel = 'Field';
 
 
     /**
@@ -80,6 +80,16 @@ class EavBehavior extends ModelBehavior {
      * 'State',
      * 'OtherModelWithIntPrimaryKey')
      * )
+     *
+     * You can also use Models from Plugins like this:
+     *
+     * array(
+     * 'uuid' = array(
+     * array('Company' => 'Plugin.Company'),
+     * ),
+     * 'key' = array(
+     * array('State' => 'Geography.State'),
+     * ')
      * @var unknown_type
      */
     public $virtualKeys = array();
@@ -121,7 +131,8 @@ class EavBehavior extends ModelBehavior {
         ), (array) $config);
         $this->settings[$model->name]['type'] = strtolower($this->settings[$model->name]['type']);
         $type = $config['type'];
-        $this->Attribute = new $this->attributeModel();
+        $this->Attribute = new $this->attributeModel;
+        debug($this->Attribute);
         if ($type == 'entity') {
             $this->entityModel = $model;
             $hasAndBelongsToMany = array();
@@ -384,8 +395,17 @@ class EavBehavior extends ModelBehavior {
     private function _bindThroughAttribute(Model $Model,$keyType) {
         if (isset($this->settings[$this->entityModel->name]['virtualKeys'][$keyType])) {
             foreach ($this->settings[$this->entityModel->name]['virtualKeys'][$keyType] as $virtualModel) {
-                $Model->$virtualModel = ClassRegistry::init($virtualModel);
-                    $attributeModel = 'Attributes' . ucfirst($keyType) . 'Value';
+                            if (is_array($virtualModel)) {
+                    $model = array_keys($virtualModel);
+                    $class = array_values($virtualModel);
+                    $virtualModel = $model[0];
+                    $virtualClass = $class[0];
+                    $Model->$virtualModel = ClassRegistry::init($virtualClass);
+                } else {
+                  $Model->$virtualModel = ClassRegistry::init($virtualModel);
+                }
+
+                $attributeModel = 'Attributes' . ucfirst($keyType) . 'Value';
                 if ($this->virtualFieldType == 'cake') {
                     //Binds the Parent Model to Associated Models with a UUID foreignKey using a HABTM relationship
                     $hasAndBelongsToMany[$virtualModel] = array(
