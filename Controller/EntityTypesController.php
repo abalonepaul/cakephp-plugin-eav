@@ -80,7 +80,7 @@ class EntityTypesController extends EavAppController {
         if (!$this->EntityType->exists()) {
             throw new NotFoundException(__('Invalid entity type'));
         }
-        if ($this->request->is('post') || $this->request->is('put')) {
+		if ($this->request->is(array('post','put'))) {
             if ($this->EntityType->save($this->request->data)) {
                 $this->Session->setFlash(__('The entity type has been saved'));
                 $this->redirect(array('action' => 'index'));
@@ -93,7 +93,7 @@ class EntityTypesController extends EavAppController {
     }
 
 /**
- * admin_delete method
+ * Delete an Entity Type
  *
  * @param string $id
  * @return void

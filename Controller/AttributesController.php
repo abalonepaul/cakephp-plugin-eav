@@ -8,7 +8,7 @@ App::uses('EavAppController', 'Eav.Controller');
  * PHP 5
  *
  * Protelligence (http://cakephp.org)
- * Copyright 2009-2013, Protelligence (http://www.protelligence.com)
+ * Copyright 2009-2016, Protelligence (http://www.protelligence.com)
  *
  * Licensed under The MIT License
  * Redistributions of files must retain the above copyright notice.

@@ -4,15 +4,15 @@
  *
  * Enables objects to utilize the Entity-Attribute-Value design pattern and act as an entity, attribute, or attribute_value.
  *
- * PHP version 5
+	 * PHP version 5
  *
  * Protelligence (http://www.protelligence.com)
- * Copyright 2009-2013, Protelligence
+ * Copyright 2009-2016, Protelligence
  *
  * Licensed under The MIT License
  * Redistributions of files must retain the above copyright notice.
  *
- * @copyright     Copyright 2009-2013, Protelligence (http://www.protelligence.com)
+ * @copyright     Copyright 2009-2016, Protelligence (http://www.protelligence.com)
  * @link          http://www.protelligence.com Protelligence
  * @package       plugins.Eav.Model.Behaviors
  * @license       MIT License (http://www.opensource.org/licenses/mit-license.php)
@@ -20,7 +20,8 @@
 /**
  * Eav Behavior Class
  *
- * @package       plugins.Eav.Model.Behaviors
+ * @package       eav
+ * @subpackage    model.behaviors.eav
  */
 App::uses('ProFields.Field','Eav.Model');
 
@@ -125,14 +126,14 @@ class EavBehavior extends ModelBehavior {
 
             }
         }
-
+        //Set the Callback priority to 1 to make sure EAV callbacks execute first.
+        $this->settings['priority'] = 1;
         $this->settings[$model->name] = array_merge(array(
                 'type' => 'entity'
         ), (array) $config);
         $this->settings[$model->name]['type'] = strtolower($this->settings[$model->name]['type']);
         $type = $config['type'];
         $this->Attribute = new $this->attributeModel;
-        debug($this->Attribute);
         if ($type == 'entity') {
             $this->entityModel = $model;
             $hasAndBelongsToMany = array();
@@ -395,16 +396,17 @@ class EavBehavior extends ModelBehavior {
     private function _bindThroughAttribute(Model $Model,$keyType) {
         if (isset($this->settings[$this->entityModel->name]['virtualKeys'][$keyType])) {
             foreach ($this->settings[$this->entityModel->name]['virtualKeys'][$keyType] as $virtualModel) {
-                            if (is_array($virtualModel)) {
+                if (is_array($virtualModel)) {
                     $model = array_keys($virtualModel);
                     $class = array_values($virtualModel);
                     $virtualModel = $model[0];
                     $virtualClass = $class[0];
-                    $Model->$virtualModel = ClassRegistry::init($virtualClass);
-                } else {
-                  $Model->$virtualModel = ClassRegistry::init($virtualModel);
-                }
 
+                } else {
+                    $virtualClass = $virtualModel;
+
+                }
+                $Model->$virtualModel = ClassRegistry::init($virtualClass);
                 $attributeModel = 'Attributes' . ucfirst($keyType) . 'Value';
                 if ($this->virtualFieldType == 'cake') {
                     //Binds the Parent Model to Associated Models with a UUID foreignKey using a HABTM relationship
@@ -415,7 +417,9 @@ class EavBehavior extends ModelBehavior {
                             'with' => 'Attributes' . ucfirst($keyType) . 'Value',
                             'joinTable' => 'attributes_' . $keyType . '_values'
                     );
-                    $Model->bindModel(array('hasAndBelongsToMany' => Set::merge($Model->hasAndBelongsToMany, $hasAndBelongsToMany)));
+                    //Passing $reset as false. Seems to fix some binding issues. 
+                    //may work well on the other binds as well.
+                    $Model->bindModel(array('hasAndBelongsToMany' => Set::merge($Model->hasAndBelongsToMany, $hasAndBelongsToMany)),false);
                 } else {
                     //Binds the Parent Model to Associated Models using a hasMany and belongsTo relationship. This adds just the Associated Model record
                     //to the AttributesUuidValue model.
@@ -425,7 +429,7 @@ class EavBehavior extends ModelBehavior {
                                     'foreignKey' => 'value'
                             )
                     );
-                    $Model->$attributeModel->$virtualModel = ClassRegistry::init($virtualModel);
+                    $Model->$attributeModel->$virtualModel = ClassRegistry::init($virtualClass);
                     $Model->$attributeModel->bindModel(array(
                             'belongsTo' => Set::merge($Model->$attributeModel->belongsTo, $belongsTo)
                     ));
@@ -635,7 +639,16 @@ class EavBehavior extends ModelBehavior {
             return $keyArray[0];
         }
     }
+	/** 
+	* Checks to see if a Model has a given Attribute.
+    protected function _hasAttribute(Model $Model, $associatedModel) {
+        $modelName = $Model->name;
+        $attributeName = Inflector::underscore(lcfirst($associatedModel)) . '_id';
+        return $this->Attribute->find('count', array('conditions' => array(
+            'EntityType.name' => $modelName,
+            $this->Attribute->name. '.name' => $attributeName)));
 
+    }
     /**
      * beforeFind Callback
      * This can be used to intercept finds by attribute fields and handle them appropriately
@@ -650,11 +663,11 @@ class EavBehavior extends ModelBehavior {
         if ($Model->recursive < 2) {
             $Model->recursive = 2;
         }
-        ;
+
         if ($this->settings[$Model->name]['type'] == 'entity') {
             if ($this->virtualFieldType == 'eav' && !empty($query['conditions'])) {
                 foreach ($query['conditions'] as $key => $value) {
-                    $field = $this->_extractField(&$Model, $key, $value);
+                    $field = $this->_extractField($Model, $key, $value);
                     $attribute = ClassRegistry::init($this->attributeModel)->find('first', array(
                             'conditions' => array(
                                     'name' => $field
@@ -687,7 +700,7 @@ class EavBehavior extends ModelBehavior {
      * @return array Returns the modified results
      * @access publics
      */
-    function afterFind(Model $Model, $results) {
+    function afterFind(Model $Model, $results, $primary = false) {
         if ($this->virtualFieldType == 'array' && (key_exists('AttributesKeyValue', $results[0])) && ($this->type == 'entity')) {
             foreach ($results as $key => $value) {
                 foreach ($this->valueModels as $dataType => $dataModel) {
@@ -754,10 +767,9 @@ class EavBehavior extends ModelBehavior {
      * @return void
      * @access public
      */
-    function afterSave(Model $model, $created) {
+    function afterSave(Model $model, $created, $options = array()) {
 
         $data = $model->data;
-        //debug($data);
         $entityId = $data[$model->name]['id'];
         foreach ($data[$model->name] as $field => $value) {
         //debug($field);
