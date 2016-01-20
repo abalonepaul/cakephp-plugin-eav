@@ -641,6 +641,7 @@ class EavBehavior extends ModelBehavior {
     }
 	/** 
 	* Checks to see if a Model has a given Attribute.
+	*/
     protected function _hasAttribute(Model $Model, $associatedModel) {
         $modelName = $Model->name;
         $attributeName = Inflector::underscore(lcfirst($associatedModel)) . '_id';
