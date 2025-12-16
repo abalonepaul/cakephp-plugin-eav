@@ -7,6 +7,7 @@ use Cake\Command\Command;
 use Cake\Console\Arguments;
 use Cake\Console\ConsoleIo;
 use Cake\Datasource\ConnectionManager;
+use Cake\Database\Connection; // import concrete type
 
 class EavMigrateJsonbToEavCommand extends Command
 {
@@ -24,7 +25,9 @@ class EavMigrateJsonbToEavCommand extends Command
             return Command::CODE_ERROR;
         }
 
+        /** @var Connection $conn */
         $conn = ConnectionManager::get('default');
+
         $Attributes = $this->getTableLocator()->get('Eav.Attributes');
         $attr = $Attributes->find()->where(['name'=>$attribute])->first();
         if (!$attr) {
@@ -32,25 +35,29 @@ class EavMigrateJsonbToEavCommand extends Command
             $Attributes->saveOrFail($attr);
         }
 
-        $pkCol = $pkType === 'int' ? 'id' : 'id';
-        $rows = $conn->execute("SELECT id, {$jsonbField} ->> :key AS val FROM {$table} WHERE {$jsonbField} ? :key", ['key'=>$attribute])->fetchAll('assoc');
+        $driver = $conn->getDriver();
+        $t = $driver->quoteIdentifier($table);
+        $f = $driver->quoteIdentifier($jsonbField);
+        $sql = "SELECT id, {$f} ->> :key AS val FROM {$t} WHERE {$f} ? :key";
+        $rows = $conn->execute($sql,['key' => $attribute])->fetchAll('assoc');
 
-        $Eav = $this->getTableLocator()->get('Eav.Model/Behavior/EavBehavior'); // not used directly; calls below mimic persistence
-        $Behavior = new \Eav\Model\Behavior\EavBehavior($this->getTableLocator()->get($table), [
-            'entityTable' => $entityTable, 'pkType' => $pkType,
+        $Table = $this->getTableLocator()->get($table);
+        $Table->addBehavior('Eav.Eav', [
+            'entityTable' => $entityTable,
+            'pkType' => $pkType,
         ]);
 
         $count = 0;
         foreach ($rows as $r) {
             if ($r['val'] === null || $r['val'] === '') { continue; }
-            $Behavior->saveEavValue($r['id'], $attribute, $type, $r['val']);
+            $Table->saveEavValue($r['id'], $attribute, $type, $r['val']);
             $count++;
         }
         $io->out("Migrated {$count} values from {$table}.{$jsonbField} -> {$attribute} ({$type}).");
         return Command::CODE_SUCCESS;
     }
 
-    public static function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
+    public function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
     {
         $parser->addArgument('table');
         $parser->addArgument('jsonbField');

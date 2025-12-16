@@ -32,7 +32,7 @@ class EavCreateAttributeCommand extends Command
         return Command::CODE_ERROR;
     }
 
-    public static function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
+    public function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
     {
         $parser->addArgument('name', ['help' => 'Attribute name or name:type']);
         $parser->addArgument('type', ['help' => 'Attribute type', 'required' => false]);
