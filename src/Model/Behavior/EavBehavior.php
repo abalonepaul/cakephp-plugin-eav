@@ -8,9 +8,12 @@ use Cake\ORM\Behavior;
 use Cake\ORM\Entity;
 use Cake\ORM\Query;
 use Cake\Utility\Hash;
+use Cake\ORM\Locator\LocatorAwareTrait;
 
 class EavBehavior extends Behavior
 {
+    use LocatorAwareTrait;
+
     protected array $_defaultConfig = [
         'entityTable'  => null,   // e.g. 'parts'
         'pkType'       => 'uuid', // 'uuid'|'int'
@@ -74,7 +77,7 @@ class EavBehavior extends Behavior
 
     protected function attributeId(string $name): string
     {
-        $Attributes = $this->tableLocator()->get('Eav.Attributes');
+        $Attributes = $this->getTableLocator()->get('Eav.Attributes');
         $attr = $Attributes->find()->select(['id'])->where(['name' => $name])->first();
         if (!$attr) { // create lazily
             $entity = $Attributes->newEntity(['name' => $name, 'data_type' => 'string']);
@@ -88,10 +91,10 @@ class EavBehavior extends Behavior
     {
         $pk = $this->getConfig('pkType') === 'int' ? 'Int' : 'Uuid';
         $class = 'Eav.Av' . ucfirst($type) . $pk;
-        return $this->tableLocator()->get($class);
+        return $this->getTableLocator()->get($class);
     }
 
-    protected function saveEavValue($entityId, string $attributeName, string $type, $val): void
+    public function saveEavValue($entityId, string $attributeName, string $type, $val): void
     {
         $attrId = $this->attributeId($attributeName);
         $tbl = $this->tableFor($type);
@@ -138,7 +141,7 @@ class EavBehavior extends Behavior
                 $eid = (string)$r->get($field);
                 $attrId = (string)$r->get('attribute_id');
                 // resolve attribute name
-                $Attributes = $this->tableLocator()->get('Eav.Attributes');
+                $Attributes = $this->getTableLocator()->get('Eav.Attributes');
                 $attr = $Attributes->find()->select(['name'])->where(['id' => $attrId])->first();
                 $name = $attr ? (string)$attr->name : $attrId;
                 $out[$eid][$name] = $r->get('val');
