@@ -1,0 +1,21 @@
+<?php
+declare(strict_types=1);
+
+namespace Eav;
+
+use Cake\Console\CommandCollection;
+use Cake\Core\BasePlugin;
+use Eav\Command\EavCreateAttributeCommand;
+use Eav\Command\EavMigrateJsonbToEavCommand;
+
+class Plugin extends BasePlugin
+{
+    public function console(CommandCollection $commands): CommandCollection
+    {
+        $commands = parent::console($commands);
+        $commands->add('eav create_attribute', EavCreateAttributeCommand::class);
+        $commands->add('eav migrate_jsonb_to_eav', EavMigrateJsonbToEavCommand::class);
+
+        return $commands;
+    }
+}
