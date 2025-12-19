@@ -21,6 +21,47 @@ Appropriate PHPUnit tests should be written for the Plugin and should be created
 ## Commit & Pull Request Guidelines
 Both the application and the plug tasks are managed in JIRA. The repo for the application is located in BitBucket and the repo for the plugin is in GitHub at `https://github.com/abalonepaul/cakephp-plugin-eav`. Commit messages must be formatted with the Issue Key and branch name. (eg. EAV-3-AI-Convention-Bugs) PRs must list: (1) work completed, (2) commands executed, (3) table counts added, and (4) any schema or configuration changes. Include screenshots or snippets when SQL Migrations change.
 
+## Current Work Plan (EAV Behavior Overhaul Branch)
+The source of truth is `/home/paul/dev/cakephp/protech_parts/plugins/Eav`. Do not modify `/home/paul/dev/cakephp/cakephp-plugin-eav`.
+
+Primary goals:
+- Stabilize EavBehavior for CakePHP 5.2.x with TypeFactory-driven data types.
+- Restore "virtual field" behavior so EAV fields appear native in queries and entities.
+- Add full PHPUnit coverage for behavior and commands.
+- Keep the plugin DB-agnostic (Postgres, MySQL/MariaDB, SQL Server, SQLite).
+
+Decisions:
+- Attribute sets remain supported and will be used to group attributes per entity.
+- JSON/JSONB can be used as an attribute value type. JSONB as a storage backend is optional and will be configured per entity table.
+- Use a setup command to generate schema and tables based on DB vendor, PK type, and UUID storage choice.
+- Only one PK family of AV tables is created per install (uuid or int), based on setup command choices.
+
+Planned work breakdown:
+1) EavBehavior rewrite
+   - Normalize type aliases (bool->boolean, int->integer, smallint->smallinteger, bigint->biginteger, double->float, timestamp->datetime).
+   - Map types to AV tables using CakePHP naming conventions and TypeFactory.
+   - Remove lossy string casting; persist native types.
+   - Avoid N+1 queries when hydrating attribute values.
+   - Keep buffered beforeMarshal/afterSave behavior.
+   - Add PHPDoc blocks and remove unused imports.
+
+2) Commands hardening
+   - EavCreateAttributeCommand validates types, sets default label, and no-ops on duplicate names.
+   - EavMigrateJsonbToEavCommand adds dry-run, batching, and DB vendor guards.
+   - Tests for command validation and dry-run behavior.
+
+3) Schema/setup
+   - Add CakePHP migrations (phinx) and raw SQL snapshots.
+   - Add a setup command to generate tables for the chosen DB vendor and PK type.
+   - Support JSON vs JSONB where the DB allows it.
+
+4) AttributeSets ORM + UI scaffolding
+   - Create/verify tables and entities for attributes, attribute sets, and join table.
+   - UI will be baked later; keep minimal server-side validation and associations.
+
+5) Documentation refresh (later)
+   - Update README after behavior and commands stabilize.
+
 ## Project Data Checklist (fill in)
 - **Database schema reference:** _/home/paul/dev/boatsnet_data/import_data/protech_parts_schema.sql_
 - **Engines fields that should remain in the Entity's table:**
