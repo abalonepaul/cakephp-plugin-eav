@@ -6,7 +6,7 @@ The Entity-Attribute-Value Design Pattern is a strategy for dynamically adding f
 often used to provide a solution for storing variable variable data. Some CRMs use this strategy in a SaaS
 environment to allow customers to add their own fields.
 
-Implementing an EAV pattern can be a complex difficult to manage process.This plugin makes provides a powerful
+Implementing an EAV pattern can be a complex difficult to manage process. This plugin makes provides a powerful
 seamless solution. Attach the behavior to your models and in most cases, you can interact with your model as
 though the dynamic fields were actually in your model's table. DefaultModel CRUD opertations work on the model
 retrieving or saving Attribute Values.
