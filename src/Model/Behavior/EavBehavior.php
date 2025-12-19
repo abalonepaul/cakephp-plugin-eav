@@ -185,7 +185,11 @@ class EavBehavior extends Behavior
         $Attributes = $this->getTableLocator()->get('Eav.Attributes');
         $attr = $Attributes->find()->select(['id', 'name'])->where(['name' => $name])->first();
         if (!$attr) {
-            $entity = $Attributes->newEntity(['name' => $name, 'data_type' => $type]);
+            $entity = $Attributes->newEntity([
+                'name' => $name,
+                'data_type' => $type,
+                'options' => [],
+            ]);
             $Attributes->saveOrFail($entity);
             $id = (string)$entity->id;
             $this->attributeIdCache[$name] = $id;
@@ -467,10 +471,14 @@ class EavBehavior extends Behavior
                     return $value;
                 }
                 if ($value instanceof \DateTimeInterface) {
-                    return DateTime::createFromFormat('Y-m-d H:i:s', $value->format('Y-m-d H:i:s'), $value->getTimezone());
+                    return DateTime::createFromFormat(
+                        'Y-m-d H:i:s',
+                        $value->format('Y-m-d H:i:s'),
+                        $value->getTimezone(),
+                    );
                 }
                 if (is_string($value)) {
-                    return DateTime::parseDateTime($value) ?? $value;
+                    return DateTime::parseDateTime($value) ?? new DateTime($value);
                 }
                 return $value;
             case 'time':
@@ -478,10 +486,10 @@ class EavBehavior extends Behavior
                     return $value;
                 }
                 if ($value instanceof \DateTimeInterface) {
-                    return Time::parseTime($value->format('H:i:s')) ?? $value;
+                    return Time::parseTime($value->format('H:i:s')) ?? new Time($value->format('H:i:s'));
                 }
                 if (is_string($value)) {
-                    return Time::parseTime($value) ?? $value;
+                    return Time::parseTime($value) ?? new Time($value);
                 }
                 return $value;
             case 'json':
