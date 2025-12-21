@@ -27,8 +27,7 @@ class EavMigrateJsonbToEavCommand extends Command
 
     /** @var array<string> */
     protected array $customTypes = [
-        'fk_uuid',
-        'fk_int',
+        'fk',
     ];
 
     /**
@@ -48,30 +47,44 @@ class EavMigrateJsonbToEavCommand extends Command
         $pkType = (string)$args->getOption('pk') ?: 'uuid';
         $dryRun = (bool)$args->getOption('dry-run');
         $batchSize = (int)($args->getOption('batch-size') ?: 1000);
+        $connectionName = (string)($args->getOption('connection') ?: 'default');
         if ($batchSize < 1) {
             $batchSize = 1000;
         }
 
-        if (!$table || !$jsonbField || !$attribute) {
-            $io->err('Usage: bin/cake eav migrate_jsonb_to_eav table jsonbField --attribute key --type decimal --entity-table items --pk uuid');
+        if ($table === '' || $jsonbField === '' || $attribute === '') {
+            $io->err('Usage: bin/cake eav migrate_jsonb_to_eav <table> <jsonbField> --attribute key --type decimal --entity-table items --pk uuid [--connection test]');
             return Command::CODE_ERROR;
         }
 
         /** @var Connection $conn */
-        $conn = ConnectionManager::get('default');
+        $conn = ConnectionManager::get($connectionName);
         $driver = $conn->getDriver();
         if (!$driver instanceof Postgres) {
             $io->err('This command requires Postgres JSONB support.');
             return Command::CODE_ERROR;
         }
 
+        // Normalize/validate type
         $normalizedType = $this->normalizeType($type, $io);
         if ($normalizedType === null) {
             return Command::CODE_ERROR;
         }
 
-        $Attributes = $this->getTableLocator()->get('Eav.Attributes');
-        $attr = $Attributes->find()->where(['name'=>$attribute])->first();
+        // Ensure the source table exists on the selected connection
+        $schema = $conn->getSchemaCollection();
+        $tables = array_map('strtolower', $schema->listTables());
+        if (!in_array(strtolower($table), $tables, true)) {
+            $io->err(sprintf(
+                'Table "%s" not found on connection "%s". Try --connection test and a valid table (e.g., "json_entities").',
+                $table,
+                $connectionName
+            ));
+            return Command::CODE_ERROR;
+        }
+
+        $Attributes = $this->getTableLocator()->get('Eav.Attributes', ['connectionName' => $connectionName]);
+        $attr = $Attributes->find()->where(['name' => $attribute])->first();
         if (!$attr) {
             $attr = $Attributes->newEntity([
                 'name' => $attribute,
@@ -84,7 +97,7 @@ class EavMigrateJsonbToEavCommand extends Command
         $t = $driver->quoteIdentifier($table);
         $f = $driver->quoteIdentifier($jsonbField);
 
-        $Table = $this->getTableLocator()->get($table);
+        $Table = $this->getTableLocator()->get($table, ['connectionName' => $connectionName]);
         $Table->addBehavior('Eav.Eav', [
             'entityTable' => $entityTable,
             'pkType' => $pkType,
@@ -94,8 +107,8 @@ class EavMigrateJsonbToEavCommand extends Command
         $offset = 0;
         $preview = [];
         while (true) {
-            // Use jsonb_exists() instead of the '?' operator to avoid PDO treating '?' as a positional placeholder.
-            $sql = "SELECT id, {$f} ->> :key AS val FROM {$t} WHERE jsonb_exists({$f}, :key)";
+            // Use jsonb_exists() (cast to ::jsonb for safety if column is json) to avoid '?' placeholder issues.
+            $sql = "SELECT id, {$f} ->> :key AS val FROM {$t} WHERE jsonb_exists({$f}::jsonb, :key)";
             $sql .= " ORDER BY id LIMIT {$batchSize} OFFSET {$offset}";
             $rows = $conn->execute($sql, ['key' => $attribute])->fetchAll('assoc');
             if ($rows === []) {
@@ -113,12 +126,12 @@ class EavMigrateJsonbToEavCommand extends Command
                     }
                 }
             } else {
-                $conn->transactional(function () use ($rows, $Table, $attribute, $type, &$count): void {
+                $conn->transactional(function () use ($rows, $Table, $attribute, $normalizedType, &$count): void {
                     foreach ($rows as $r) {
                         if ($r['val'] === null || $r['val'] === '') {
                             continue;
                         }
-                        $Table->saveEavValue($r['id'], $attribute, $type, $r['val']);
+                        $Table->saveEavValue($r['id'], $attribute, $normalizedType, $r['val']);
                         $count++;
                     }
                 });
@@ -155,6 +168,9 @@ class EavMigrateJsonbToEavCommand extends Command
         if ($raw === 'jsonb') {
             $raw = 'json';
         }
+        if ($raw === 'fk_uuid' || $raw === 'fk_int') {
+            $raw = 'fk';
+        }
         $normalized = $this->typeAliases[$raw] ?? $raw;
         if (in_array($normalized, $this->customTypes, true)) {
             return $normalized;
@@ -172,11 +188,13 @@ class EavMigrateJsonbToEavCommand extends Command
         $parser->addArgument('table');
         $parser->addArgument('jsonbField');
         $parser->addOption('attribute', ['short'=>'a', 'help'=>'JSON key to migrate', 'required'=>true]);
-        $parser->addOption('type', ['short'=>'t', 'help'=>'EAV type (string,int,decimal,bool,date,datetime,json,uuid,fk_uuid)']);
+        $parser->addOption('type', ['short'=>'t', 'help'=>'EAV type (string,int,decimal,bool,date,datetime,json,uuid,fk)']);
         $parser->addOption('entity-table', ['help'=>'Entity table name in AV rows']);
         $parser->addOption('pk', ['help'=>'Primary key type: uuid|int', 'default'=>'uuid']);
         $parser->addOption('dry-run', ['help' => 'Preview without writing', 'boolean' => true]);
         $parser->addOption('batch-size', ['help' => 'Batch size', 'default' => 1000]);
+        // Allow choosing the connection (e.g., --connection test)
+        $parser->addOption('connection', ['help' => 'Datasource connection name', 'default' => 'default']);
         return $parser;
     }
 }

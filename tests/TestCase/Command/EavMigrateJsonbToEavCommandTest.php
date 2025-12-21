@@ -3,10 +3,10 @@ declare(strict_types=1);
 
 namespace Eav\Test\TestCase\Command;
 
+use Cake\Console\TestSuite\ConsoleIntegrationTestTrait;
 use Cake\Database\Schema\TableSchema;
 use Cake\Datasource\ConnectionManager;
 use Cake\ORM\TableRegistry;
-use Cake\Console\TestSuite\ConsoleIntegrationTestTrait;
 use Cake\TestSuite\TestCase;
 
 class EavMigrateJsonbToEavCommandTest extends TestCase
@@ -16,6 +16,7 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
     protected array $fixtures = [
         'plugin.Eav.Attributes',
         'plugin.Eav.EavString',
+        'plugin.Eav.JsonEntities',
     ];
 
     public static function setUpBeforeClass(): void
@@ -78,21 +79,22 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
     {
         parent::setUp();
         $connection = ConnectionManager::get('test');
-        $connection->execute('TRUNCATE attribute_set_attributes, attributes, eav_string, test_json_entities CASCADE');
+        // Truncate target and source tables; attributes can be empty (command creates attribute if needed)
+        $connection->execute('TRUNCATE attributes, eav_string, json_entities CASCADE');
     }
 
     public function testDryRun(): void
     {
         $connection = ConnectionManager::get('test');
         $connection->execute(
-            'INSERT INTO test_json_entities (id, data) VALUES (:id, :data)',
+            'INSERT INTO json_entities (id, data) VALUES (:id, :data)',
             [
                 'id' => 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
                 'data' => json_encode(['color' => 'red'], JSON_THROW_ON_ERROR),
             ]
         );
 
-        $this->exec('eav migrate_jsonb_to_eav test_json_entities data --attribute color --type string --dry-run');
+        $this->exec('eav migrate_jsonb_to_eav json_entities data --attribute color --type string --dry-run --connection test');
         $this->assertExitSuccess();
         $this->assertOutputContains('Dry run: 1 values would be migrated.');
 
@@ -104,14 +106,14 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
     {
         $connection = ConnectionManager::get('test');
         $connection->execute(
-            'INSERT INTO test_json_entities (id, data) VALUES (:id, :data)',
+            'INSERT INTO json_entities (id, data) VALUES (:id, :data)',
             [
                 'id' => 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
                 'data' => json_encode(['color' => 'blue'], JSON_THROW_ON_ERROR),
             ]
         );
 
-        $this->exec('eav migrate_jsonb_to_eav test_json_entities data --attribute color --type string');
+        $this->exec('eav migrate_jsonb_to_eav json_entities data --attribute color --type string --connection test');
         $this->assertExitSuccess();
         $this->assertOutputContains('Migrated 1 values');
 

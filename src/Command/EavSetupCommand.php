@@ -25,12 +25,15 @@ class EavSetupCommand extends Command
         'timestamp' => 'datetime',
         'varchar' => 'string',
         'jsonb' => 'json',
+        // Back-compat aliases for unified FK type
+        'fk_uuid' => 'fk',
+        'fk_int' => 'fk',
     ];
 
     /** @var array<string> */
     protected array $customTypes = [
-        'fk_uuid',
-        'fk_int',
+        // Unified FK custom type, single table eav_fk
+        'fk',
     ];
 
     /** @var array<string,array{type:string,options:array<string,mixed>}> */
@@ -62,8 +65,7 @@ class EavSetupCommand extends Command
         'point' => ['type' => 'point', 'options' => []],
         'linestring' => ['type' => 'linestring', 'options' => []],
         'polygon' => ['type' => 'polygon', 'options' => []],
-        'fk_uuid' => ['type' => 'uuid', 'options' => []],
-        'fk_int' => ['type' => 'biginteger', 'options' => []],
+        // Note: 'fk' is handled specially in buildMigration based on pk family
     ];
 
     /**
@@ -102,7 +104,10 @@ class EavSetupCommand extends Command
             $jsonStorage = 'json';
         }
 
-        $types = $this->resolveTypes();
+        // Feature 2: resolve selected types (defaults, all, or CSV)
+        $typesArg = (string)($args->getOption('types') ?? 'defaults');
+        $types = $this->resolveSelectedTypes($typesArg);
+
         $payload = $this->buildMigration(
             $migrationName,
             $pkType,
@@ -138,15 +143,15 @@ class EavSetupCommand extends Command
     }
 
     /**
-     * Resolve supported types from TypeFactory plus custom types.
+     * Resolve supported types from TypeFactory plus custom types based on selection.
      *
+     * @param string $typesArg defaults|all|csv
      * @return array<string>
      */
-    protected function resolveTypes(): array
+    protected function resolveSelectedTypes(string $typesArg): array
     {
-        // Feature 1: limit to a safe default set used by tests and core behavior.
-        // Advanced/geospatial types are added in Feature 2 via interactive setup.
-        return [
+        // Defaults (pre-selected)
+        $defaults = [
             'string',
             'text',
             'integer',
@@ -159,14 +164,51 @@ class EavSetupCommand extends Command
             'date',
             'datetime',
             'time',
-            'timestamp', // harmless; same as datetime in many drivers
             'json',
             'uuid',
             'binaryuuid',
             'nativeuuid',
-            'fk_uuid',
-            'fk_int',
+            'fk',
         ];
+
+        // All = union of known map types + custom 'fk'
+        $all = array_values(array_unique(array_merge(array_keys($this->typeMap), ['fk'])));
+
+        $arg = strtolower(trim((string)$typesArg));
+        if ($arg === '' || $arg === 'defaults') {
+            return $defaults;
+        }
+        if ($arg === 'all') {
+            return $all;
+        }
+
+        // CSV selection with alias normalization
+        $parts = array_filter(array_map('trim', explode(',', $typesArg)));
+        $normalized = [];
+        foreach ($parts as $t) {
+            $tRaw = strtolower($t);
+            $alias = $this->typeAliases[$tRaw] ?? $tRaw;
+            $normalized[] = $alias;
+        }
+        $normalized = array_values(array_unique($normalized));
+
+        // Validate: accept custom 'fk', typeMap keys, or anything resolvable by TypeFactory
+        $valid = [];
+        foreach ($normalized as $t) {
+            if ($t === 'fk') {
+                $valid[] = $t;
+                continue;
+            }
+            if (isset($this->typeMap[$t])) {
+                $valid[] = $t;
+                continue;
+            }
+            if (TypeFactory::getMap($t) !== null) {
+                $valid[] = $t;
+            }
+        }
+
+        return $valid ?: $defaults;
     }
 
     /**
@@ -186,31 +228,51 @@ class EavSetupCommand extends Command
         string $jsonStorage,
         array $types
     ): string {
-        // Plan step: canonical eav_* naming, unified entity_id, and value column.
+        // Canonical eav_* naming, unified entity_id, and value column
         $entityField = 'entity_id';
         $entityFieldType = $pkType === 'int' ? 'biginteger' : $uuidType;
 
-        // Build table specs for selected types. For JSON, keep table name eav_json; only the column type varies.
+        // Build table specs for selected types.
         $tableSpecs = [];
         foreach ($types as $type) {
-            if (!isset($this->typeMap[$type])) {
+            // Special handling for fk: single table eav_fk; value type depends on PK family
+            if ($type === 'fk') {
+                $tableSpecs[] = [
+                    'table' => 'eav_fk',
+                    'valType' => $entityFieldType,
+                    'valOptions' => [],
+                ];
                 continue;
             }
-            $valSpec = $this->typeMap[$type];
-            $tableType = $type; // canonical names (e.g. string, integer, json)
-            $valType = $valSpec['type'];
-            $valOptions = $valSpec['options'];
 
-            if ($type === 'json') {
-                $tableType = 'json';         // always eav_json
-                $valType = $jsonStorage;     // column type json or jsonb
+            // Known mapped type
+            if (isset($this->typeMap[$type])) {
+                $valSpec = $this->typeMap[$type];
+                $tableType = $type;
+                $valType = $valSpec['type'];
+                $valOptions = $valSpec['options'];
+
+                if ($type === 'json') {
+                    $tableType = 'json';     // always eav_json
+                    $valType = $jsonStorage; // column type json or jsonb
+                }
+
+                $tableSpecs[] = [
+                    'table' => "eav_{$tableType}",
+                    'valType' => $valType,
+                    'valOptions' => $valOptions,
+                ];
+                continue;
             }
 
-            $tableSpecs[] = [
-                'table' => "eav_{$tableType}",
-                'valType' => $valType,
-                'valOptions' => $valOptions,
-            ];
+            // Fallback for TypeFactory-known types not in $typeMap
+            if (TypeFactory::getMap($type) !== null) {
+                $tableSpecs[] = [
+                    'table' => "eav_{$type}",
+                    'valType' => $type,
+                    'valOptions' => [],
+                ];
+            }
         }
 
         $specLines = [];
@@ -277,8 +339,7 @@ class {$className} extends AbstractMigration
                 ->addColumn('{$entityField}', '{$entityFieldType}', ['null' => false])
                 ->addColumn('attribute_id', '{$uuidType}', ['null' => false])
                 ->addColumn('value', \$spec['valType'], \$spec['valOptions'])
-                ->addColumn('created', 'datetime', ['null' => false])
-                ->addColumn('modified', 'datetime', ['null' => false])
+                ->addTimestamps('created', 'modified')
                 ->addIndex(['entity_table', '{$entityField}', 'attribute_id'], ['unique' => true, 'name' => 'idx_' . \$spec['table'] . '_lookup'])
                 ->addForeignKey('attribute_id', 'attributes', 'id', ['delete' => 'CASCADE'])
                 ->create();
@@ -326,6 +387,8 @@ PHP;
         $parser->addOption('connection', ['help' => 'Connection name', 'default' => 'default']);
         $parser->addOption('name', ['help' => 'Migration class name', 'default' => 'EavSetup']);
         $parser->addOption('dry-run', ['help' => 'Output migration without writing', 'boolean' => true]);
+        // Feature 2: allow selecting types to scaffold
+        $parser->addOption('types', ['help' => 'Types to scaffold: defaults|all|csv (e.g. "string,int,json,fk")', 'default' => 'defaults']);
         return $parser;
     }
 }

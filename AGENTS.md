@@ -108,4 +108,4 @@ Planned work breakdown:
   - The rest of the fields are the extensive part attributes that Sierra provided. There are some redundant fields, but we don't need to populate them now.
 
 # Revised Master Plan #
-The revised master plan is located in `/home/paul/dev/protech_par/plugins/Eav/PLAN.md`
+The revised master plan is located in `/home/paul/dev/cakephp/protech_parts/plugins/Eav/PLAN.md`

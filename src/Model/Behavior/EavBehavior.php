@@ -13,6 +13,7 @@ use Cake\I18n\Time;
 use Cake\ORM\Behavior;
 use Cake\ORM\Locator\LocatorAwareTrait;
 use Cake\ORM\Query;
+use Cake\ORM\Table;
 use Cake\Utility\Inflector;
 use InvalidArgumentException;
 use JsonException;
@@ -51,12 +52,14 @@ class EavBehavior extends Behavior
         'double' => 'float',
         'timestamp' => 'datetime',
         'varchar' => 'string',
+        // Back-compat aliases
+        'fk_uuid' => 'fk',
+        'fk_int' => 'fk',
     ];
 
     /** @var array<string> */
     protected array $customTypes = [
-        'fk_uuid',
-        'fk_int',
+        'fk',
     ];
 
     /** @var array<string,string> */
@@ -225,7 +228,20 @@ class EavBehavior extends Behavior
      */
     protected function tableFor(string $type, ?string $storage = null): \Cake\ORM\Table
     {
-        return $this->getTableLocator()->get($this->avTableClass($type, $storage));
+        // Step 2: Try canonical class first; if missing, fall back to a generic Table with explicit eav_<type> name.
+        $segment = $this->tableTypeSegment($type, $storage);
+        $fqcn = 'Eav\\Model\\Table\\Eav' . $segment . 'Table';
+        if (class_exists($fqcn)) {
+            return $this->getTableLocator()->get($this->avTableClass($type, $storage));
+        }
+
+        $tableName = 'eav_' . strtolower($type);
+        $alias = 'EavDynamic' . $segment;
+
+        return $this->getTableLocator()->get($alias, [
+            'className' => Table::class,
+            'table' => $tableName,
+        ]);
     }
 
     /**
@@ -510,8 +526,10 @@ class EavBehavior extends Behavior
             case 'uuid':
             case 'binaryuuid':
             case 'nativeuuid':
-            case 'fk_uuid':
                 return (string)$value;
+            case 'fk':
+                // Step 2: FK casting depends on configured pk family
+                return $this->getConfig('pkType') === 'int' ? (int)$value : (string)$value;
             default:
                 return $value;
         }

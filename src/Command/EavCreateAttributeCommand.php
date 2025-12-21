@@ -25,8 +25,7 @@ class EavCreateAttributeCommand extends Command
 
     /** @var array<string> */
     protected array $customTypes = [
-        'fk_uuid',
-        'fk_int',
+        'fk',
     ];
 
     /**
@@ -89,6 +88,9 @@ class EavCreateAttributeCommand extends Command
         $raw = strtolower(trim($type));
         if ($raw === 'jsonb') {
             $raw = 'json';
+        }
+        if ($raw === 'fk_uuid' || $raw === 'fk_int') {
+            $raw = 'fk';
         }
         $normalized = $this->typeAliases[$raw] ?? $raw;
         if (in_array($normalized, $this->customTypes, true)) {
