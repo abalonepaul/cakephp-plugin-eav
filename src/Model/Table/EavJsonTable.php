@@ -5,12 +5,12 @@ namespace Eav\Model\Table;
 
 use Cake\ORM\Table;
 
-class AvDateIntTable extends Table
+class EavJsonTable extends Table
 {
     public function initialize(array $config): void
     {
         parent::initialize($config);
-        $this->setTable('av_date_int');
+        $this->setTable('eav_json');
         $this->setPrimaryKey('id');
         $this->addBehavior('Timestamp');
     }

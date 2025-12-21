@@ -23,12 +23,13 @@ class EavBehavior extends Behavior
     use LocatorAwareTrait;
 
     protected array $_defaultConfig = [
-        'entityTable'  => null,   // e.g. 'items'
-        'pkType'       => 'uuid', // 'uuid'|'int'
-        'attributeSet' => null,
-        'map'          => [],     // 'field' => ['attribute'=>'name','type'=>'decimal']
-        'events'       => ['beforeMarshal'=>true,'afterSave'=>true,'afterFind'=>true],
-        'jsonStorage'  => 'json', // json|jsonb
+        'entityTable'       => null,   // e.g. 'items'
+        'pkType'            => 'uuid', // 'uuid'|'int' (affects column type only)
+        'attributeSet'      => null,
+        'map'               => [],     // 'field' => ['attribute'=>'name','type'=>'decimal']
+        'events'            => ['beforeMarshal'=>true,'afterSave'=>true,'afterFind'=>true],
+        'jsonStorage'       => 'json', // json|jsonb
+        'jsonEncodeOnWrite' => true,   // gate JSON encoding behavior on writes
     ];
 
     /** @var array<string,mixed> */
@@ -211,7 +212,8 @@ class EavBehavior extends Behavior
      */
     protected function avTableClass(string $type, ?string $storage = null): string
     {
-        return 'Eav.Av' . $this->tableTypeSegment($type, $storage) . $this->pkSuffix();
+        // Canonical EAV table classes are Eav* (no PK family suffix). JSON storage does not affect class name.
+        return 'Eav.Eav' . $this->tableTypeSegment($type, $storage);
     }
 
     /**
@@ -247,7 +249,7 @@ class EavBehavior extends Behavior
             'entity_table' => (string)$this->getConfig('entityTable'),
             $entityField => $entityId,
             'attribute_id' => $attrId,
-            'val' => $value,
+            'value' => $value,
         ];
         $row = $tbl->find()
             ->where([
@@ -257,7 +259,7 @@ class EavBehavior extends Behavior
             ])
             ->first();
         if ($row) {
-            $tbl->patchEntity($row, ['val' => $value]);
+            $tbl->patchEntity($row, ['value' => $value]);
         } else {
             $row = $tbl->newEntity($data);
         }
@@ -303,7 +305,7 @@ class EavBehavior extends Behavior
                 $rawRows[] = [
                     'entity_id' => (string)$r->get($entityField),
                     'attribute_id' => $attrId,
-                    'val' => $r->get('val'),
+                    'value' => $r->get('value'),
                 ];
                 $attributeIds[$attrId] = true;
             }
@@ -324,7 +326,7 @@ class EavBehavior extends Behavior
         $out = [];
         foreach ($rawRows as $row) {
             $name = $nameMap[$row['attribute_id']] ?? $row['attribute_id'];
-            $out[$row['entity_id']][$name] = $row['val'];
+            $out[$row['entity_id']][$name] = $row['value'];
         }
         return $out;
     }
@@ -364,9 +366,9 @@ class EavBehavior extends Behavior
         );
 
         if ($op === 'IN') {
-            $query->where(["{$alias}.val IN" => (array)$value]);
+            $query->where(["{$alias}.value IN" => (array)$value]);
         } else {
-            $query->where(["{$alias}.val {$op}" => $value]);
+            $query->where(["{$alias}.value {$op}" => $value]);
         }
 
         return $query;
@@ -410,6 +412,7 @@ class EavBehavior extends Behavior
         if (!is_string($storage) || !in_array($storage, ['json', 'jsonb'], true)) {
             $storage = 'json';
         }
+        // Storage does not influence class/table naming anymore, only column type.
         return $storage;
     }
 
@@ -493,6 +496,9 @@ class EavBehavior extends Behavior
                 }
                 return $value;
             case 'json':
+                if (!$this->getConfig('jsonEncodeOnWrite')) {
+                    return $value;
+                }
                 if (is_array($value) || $value instanceof \JsonSerializable || is_object($value)) {
                     try {
                         return json_encode($value, JSON_THROW_ON_ERROR);
@@ -518,7 +524,8 @@ class EavBehavior extends Behavior
      */
     protected function entityIdField(): string
     {
-        return $this->getConfig('pkType') === 'int' ? 'entity_int_id' : 'entity_id';
+        // Canonicalized: always use entity_id (type varies by pk family).
+        return 'entity_id';
     }
 
     /**
@@ -530,9 +537,10 @@ class EavBehavior extends Behavior
      */
     protected function tableTypeSegment(string $type, ?string $storage = null): string
     {
+        // Canonicalize JSON/JSONB to the same class segment "Json"
         $tableType = $this->tableTypeAliases[$type] ?? $type;
-        if ($type === 'json' && $storage === 'jsonb') {
-            $tableType = 'jsonb';
+        if ($type === 'json') {
+            $tableType = 'json';
         }
         return Inflector::camelize($tableType);
     }

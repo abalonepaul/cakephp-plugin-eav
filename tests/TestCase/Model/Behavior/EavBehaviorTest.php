@@ -38,9 +38,70 @@ class EavBehaviorTest extends TestCase
 {
     protected array $fixtures = [
         'plugin.Eav.Attributes',
-        'plugin.Eav.AvString',
-        'plugin.Eav.AvJson',
+        'plugin.Eav.EavString',
+        'plugin.Eav.EavJson',
     ];
+
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+
+        $connection = \Cake\Datasource\ConnectionManager::get('test');
+        $existing = $connection->getSchemaCollection()->listTables();
+        $definitions = [];
+
+        if (!in_array('attributes', $existing, true)) {
+            $schema = new \Cake\Database\Schema\TableSchema('attributes');
+            $schema
+                ->addColumn('id', ['type' => 'uuid', 'null' => false])
+                ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
+                ->addColumn('label', ['type' => 'string', 'length' => 255, 'null' => true])
+                ->addColumn('data_type', ['type' => 'string', 'length' => 50, 'null' => false])
+                ->addColumn('options', ['type' => 'json', 'null' => false])
+                ->addColumn('created', ['type' => 'datetime', 'null' => false])
+                ->addColumn('modified', ['type' => 'datetime', 'null' => false])
+                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
+            $definitions[] = $schema;
+        }
+
+        if (!in_array('eav_string', $existing, true)) {
+            $schema = new \Cake\Database\Schema\TableSchema('eav_string');
+            $schema
+                ->addColumn('id', ['type' => 'uuid', 'null' => false])
+                ->addColumn('entity_table', ['type' => 'string', 'length' => 191, 'null' => false])
+                ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
+                ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
+                ->addColumn('value', ['type' => 'string', 'length' => 1024, 'null' => false])
+                ->addColumn('created', ['type' => 'datetime', 'null' => false])
+                ->addColumn('modified', ['type' => 'datetime', 'null' => false])
+                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
+            $definitions[] = $schema;
+        }
+
+        if (!in_array('eav_json', $existing, true)) {
+            $schema = new \Cake\Database\Schema\TableSchema('eav_json');
+            $schema
+                ->addColumn('id', ['type' => 'uuid', 'null' => false])
+                ->addColumn('entity_table', ['type' => 'string', 'length' => 191, 'null' => false])
+                ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
+                ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
+                ->addColumn('value', ['type' => 'json', 'null' => false])
+                ->addColumn('created', ['type' => 'datetime', 'null' => false])
+                ->addColumn('modified', ['type' => 'datetime', 'null' => false])
+                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
+            $definitions[] = $schema;
+        }
+
+        if ($definitions !== []) {
+            $connection->disableConstraints(function ($connection) use ($definitions): void {
+                foreach ($definitions as $schema) {
+                    foreach ($schema->createSql($connection) as $sql) {
+                        $connection->execute($sql);
+                    }
+                }
+            });
+        }
+    }
 
     private Table $table;
     private TestEavBehavior $behavior;
@@ -80,7 +141,7 @@ class EavBehaviorTest extends TestCase
         $normalized = $this->behavior->exposeNormalizeType('jsonb');
         $this->assertSame('json', $normalized['type']);
         $this->assertSame('jsonb', $normalized['storage']);
-        $this->assertSame('Eav.AvJsonbUuid', $this->behavior->exposeAvTableClass('json', 'jsonb'));
+        $this->assertSame('Eav.EavJson', $this->behavior->exposeAvTableClass('json', 'jsonb'));
     }
 
     public function testCastValuePreservesNativeTypes(): void

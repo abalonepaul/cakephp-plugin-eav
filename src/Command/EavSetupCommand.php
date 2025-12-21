@@ -144,17 +144,29 @@ class EavSetupCommand extends Command
      */
     protected function resolveTypes(): array
     {
-        $types = array_keys(TypeFactory::getMap() ?? []);
-        $normalized = [];
-        foreach ($types as $type) {
-            $alias = $this->typeAliases[$type] ?? $type;
-            $normalized[$alias] = true;
-        }
-        foreach ($this->customTypes as $type) {
-            $normalized[$type] = true;
-        }
-
-        return array_keys($normalized);
+        // Feature 1: limit to a safe default set used by tests and core behavior.
+        // Advanced/geospatial types are added in Feature 2 via interactive setup.
+        return [
+            'string',
+            'text',
+            'integer',
+            'smallinteger',
+            'tinyinteger',
+            'biginteger',
+            'decimal',
+            'float',
+            'boolean',
+            'date',
+            'datetime',
+            'time',
+            'timestamp', // harmless; same as datetime in many drivers
+            'json',
+            'uuid',
+            'binaryuuid',
+            'nativeuuid',
+            'fk_uuid',
+            'fk_int',
+        ];
     }
 
     /**
@@ -174,26 +186,28 @@ class EavSetupCommand extends Command
         string $jsonStorage,
         array $types
     ): string {
-        $pkSuffix = $pkType === 'int' ? 'int' : 'uuid';
-        $entityField = $pkType === 'int' ? 'entity_int_id' : 'entity_id';
+        // Plan step: canonical eav_* naming, unified entity_id, and value column.
+        $entityField = 'entity_id';
         $entityFieldType = $pkType === 'int' ? 'biginteger' : $uuidType;
-        $jsonTableName = $jsonStorage === 'jsonb' ? 'jsonb' : 'json';
 
+        // Build table specs for selected types. For JSON, keep table name eav_json; only the column type varies.
         $tableSpecs = [];
         foreach ($types as $type) {
             if (!isset($this->typeMap[$type])) {
                 continue;
             }
             $valSpec = $this->typeMap[$type];
-            $tableType = $type;
+            $tableType = $type; // canonical names (e.g. string, integer, json)
             $valType = $valSpec['type'];
             $valOptions = $valSpec['options'];
+
             if ($type === 'json') {
-                $tableType = $jsonTableName;
-                $valType = $jsonStorage;
+                $tableType = 'json';         // always eav_json
+                $valType = $jsonStorage;     // column type json or jsonb
             }
+
             $tableSpecs[] = [
-                'table' => "av_{$tableType}_{$pkSuffix}",
+                'table' => "eav_{$tableType}",
                 'valType' => $valType,
                 'valOptions' => $valOptions,
             ];
@@ -224,8 +238,7 @@ class {$className} extends AbstractMigration
                 ->addColumn('label', 'string', ['limit' => 255, 'null' => true])
                 ->addColumn('data_type', 'string', ['limit' => 50, 'null' => false])
                 ->addColumn('options', 'json', ['null' => false])
-                ->addColumn('created', 'datetime', ['null' => false])
-                ->addColumn('modified', 'datetime', ['null' => false])
+                ->addTimestamps('created', 'modified')
                 ->addIndex(['name'], ['unique' => true, 'name' => 'idx_attributes_name'])
                 ->create();
         }
@@ -234,8 +247,7 @@ class {$className} extends AbstractMigration
             \$this->table('attribute_sets', ['id' => false, 'primary_key' => ['id']])
                 ->addColumn('id', '{$uuidType}', ['null' => false])
                 ->addColumn('name', 'string', ['limit' => 191, 'null' => false])
-                ->addColumn('created', 'datetime', ['null' => false])
-                ->addColumn('modified', 'datetime', ['null' => false])
+                ->addTimestamps('created', 'modified')
                 ->addIndex(['name'], ['unique' => true, 'name' => 'idx_attribute_sets_name'])
                 ->create();
         }
@@ -264,7 +276,7 @@ class {$className} extends AbstractMigration
                 ->addColumn('entity_table', 'string', ['limit' => 191, 'null' => false])
                 ->addColumn('{$entityField}', '{$entityFieldType}', ['null' => false])
                 ->addColumn('attribute_id', '{$uuidType}', ['null' => false])
-                ->addColumn('val', \$spec['valType'], \$spec['valOptions'])
+                ->addColumn('value', \$spec['valType'], \$spec['valOptions'])
                 ->addColumn('created', 'datetime', ['null' => false])
                 ->addColumn('modified', 'datetime', ['null' => false])
                 ->addIndex(['entity_table', '{$entityField}', 'attribute_id'], ['unique' => true, 'name' => 'idx_' . \$spec['table'] . '_lookup'])

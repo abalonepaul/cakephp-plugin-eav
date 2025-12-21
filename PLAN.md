@@ -19,7 +19,7 @@ High-level principles
 - DB-agnostic by default; detect default datasource/driver; guard Postgres-only features automatically.
 - Configuration persistence: save setup answers to a durable configuration (file and/or DB), and stamp migrations/SQL with the chosen settings.
 
-Feature 1 — Cleanup/Hardening
+Feature 1 — Cleanup/Hardening (Done)
 What’s drifting
 - Value tables and classes currently use Av* and pk suffixes (e.g., av_string_uuid/av_string_int) and class resolution uses pk suffixes: see [EavBehavior#avTableClass](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#avTableClass) and [EavBehavior#pkSuffix](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#pkSuffix).
 - JSONB naming drift in class/name composition (Json vs Jsonb): [EavBehavior#tableTypeSegment](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#tableTypeSegment).
@@ -35,11 +35,84 @@ Realignment
   - Optionally: eav_settings table for multi-node deployments; not required initially.
   - Stamp generated migrations/SQL with a header comment summarizing chosen options.
 
-Acceptance
+Acceptanced
 - Behavior resolves to Eav* classes and eav_* tables.
 - Entity ID field is always entity_id; column type matches configured PK family.
 - Value column is value across all code and schema.
 - No dependency on Av* names or *_uuid/_int tables.
+
+Summary and Confirmation
+- Summary of changes for Feature 1 (Cleanup/Hardening)
+  Behavior updates
+  Canonical naming and resolution implemented in EavBehavior:
+  avTableClass resolves to Eav* classes mapped to eav_* tables (no PK suffix dependency).
+  Unified entity ID field via entityIdField to always use entity_id (type varies by PK family).
+  Switched from val to value across reads/writes (saveEavValue, fetchEavValues, findByAttribute).
+  JSON naming canonicalized to the “Json” segment; added jsonEncodeOnWrite gating for write-time JSON encoding.
+
+- Setup command hardening
+  Canonical schema generation in EavSetupCommand:
+  Generates eav_* tables (e.g., eav_string, eav_json).
+  Always uses entity_id; column type based on configured PK family (UUID subtype or BIGINT).
+  Uses value column consistently; eav_json.value uses json or jsonb per driver and choice.
+  Limits default scaffolded types to a safe baseline; advanced/geospatial types deferred to Feature 2.
+  Migration naming conflict guidance given; resolved by removing the older migration or using a unique --name.
+  JSONB migrator fixes
+
+- EavMigrateJsonbToEavCommand:
+  Replaced the Postgres “?” operator with jsonb_exists(...) to avoid PDO “?” placeholder conflicts.
+  Continues to guard for Postgres-only features and uses the behavior to persist EAV values.
+  Added files (new)
+  EavStringTable.php: Maps to eav_string.
+  EavJsonTable.php: Maps to eav_json.
+  EavStringFixture.php: eav_string with value column.
+  EavJsonFixture.php: eav_json with value column.
+
+- Modified files
+  EavBehavior.php: Canonical resolution, unified entity_id, value column, JSON gating.
+  EavSetupCommand.php: Canonical eav_* tables, entity_id, value column; safe default types.
+  EavMigrateJsonbToEavCommand.php: jsonb_exists fix for queries.
+  EavBehaviorTest.php: Updated fixtures to Eav*; added setUpBeforeClass to ensure attributes, eav_string, and eav_json exist in test DB; expectations updated for canonical JSON class resolution and value column.
+  EavSetupCommandTest.php: Verifies dry-run output and presence of attributes/attribute_sets in migration.
+  EavMigrateJsonbToEavCommandTest.php: Adjusted TRUNCATE to include attribute_set_attributes and CASCADE to satisfy FK constraints, and updated to eav_string/value. (File not shown above, but this change was applied during test stabilization.)
+
+- Deleted files (by you)
+  Legacy Av* Table classes under plugins/Eav/src/Model/Table (e.g., AvStringUuidTable.php, AvJsonUuidTable.php, AvStringIntTable.php, etc.).
+  Legacy Av* fixtures under plugins/Eav/tests/Fixture.
+  Legacy SQL snapshots under plugins/Eav/config/Migrations/*.sql.
+  What intentionally remains unchanged in Feature 1
+  Core tables for attributes and sets remain unprefixed: attributes, attribute_sets, attribute_set_attributes. Prefixing and junction model conventions are planned for Feature 5 per PLAN.md.
+
+- Commands used during this work
+  Generate migration for test connection:
+  bin/cake eav setup --pk-type uuid --uuid-type uuid --json-storage json --connection test
+  Apply plugin migrations to test DB:
+  bin/cake migrations migrate -p Eav -c test
+  Run PHPUnit test suites:
+  vendor/bin/phpunit plugins/Eav/tests
+  vendor/bin/phpunit plugins/Eav/tests/TestCase/Model/Behavior/EavBehaviorTest.php
+  vendor/bin/phpunit plugins/Eav/tests/TestCase/Command/EavSetupCommandTest.php
+  vendor/bin/phpunit plugins/Eav/tests/TestCase/Command/EavMigrateJsonbToEavCommandTest.php
+  Outcome
+  All Feature 1 acceptance criteria are met: Behavior/table resolution is canonical (Eav*/eav_), entity_id is unified, value column is consistent, and Av dependencies and legacy SQL snapshots are removed. Prefixing of core attribute/attribute set tables is deferred to Feature 5 as planned.
+
+Confirmation against acceptance
+  - "Behavior resolves to Eav* classes and eav_* tables: Yes.
+  Class resolution via avTableClass now returns Eav.* classes (no PK suffix) and canonicalizes JSON to EavJson.
+  Corresponding Eav* Table classes are in place (tests passed), so resolution maps to eav_* tables correctly.
+  Entity ID field is always entity_id; type matches PK family: Yes.
+  Behavior returns entity_id from entityIdField.
+  Setup generates entity_id with the proper type in buildMigration (UUID subtype or BIGINT).
+  Value column is value across all code and schema: Yes.
+  Behavior writes/reads value in saveEavValue, fetchEavValues, and findByAttribute.
+  Setup generates value columns in buildMigration.
+  No dependency on Av* names or *_uuid/_int tables: Yes.
+  Av* classes/fixtures were removed by you; tests use Eav* and eav_* exclusively and now pass.
+  JSONB migrator fixed to avoid “?” placeholder issues using jsonb_exists() in execute.
+  Static SQL snapshots removed: Yes (you deleted them).
+  Notes/deferrals per PLAN
+  Attributes/AttributeSets tables remain unprefixed and the join table remains attribute_set_attributes by design; prefixing is scheduled in Feature 5 (see plugins/Eav/PLAN.md).
+  Configuration persistence to plugins/Eav/config/eav.json and interactive setup are planned for Feature 4; not required in Feature 1."
 
 Feature 2 — Data Type Support
 Goals
