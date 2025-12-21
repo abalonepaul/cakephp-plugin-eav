@@ -106,3 +106,6 @@ Planned work breakdown:
   - legacy_source: This is a text field referring to the source of the data. It should be 'boats.net' for this project.
   - brand: This is the Brand Name such as Honda. We really should add a brand_id field, but Sierra isn't in the Brands table.
   - The rest of the fields are the extensive part attributes that Sierra provided. There are some redundant fields, but we don't need to populate them now.
+
+# Revised Master Plan #
+The revised master plan is located in `/home/paul/dev/protech_par/plugins/Eav/PLAN.md`
