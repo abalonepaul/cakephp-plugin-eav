@@ -94,7 +94,8 @@ class EavMigrateJsonbToEavCommand extends Command
         $offset = 0;
         $preview = [];
         while (true) {
-            $sql = "SELECT id, {$f} ->> :key AS val FROM {$t} WHERE {$f} ? :key";
+            // Use jsonb_exists() instead of the '?' operator to avoid PDO treating '?' as a positional placeholder.
+            $sql = "SELECT id, {$f} ->> :key AS val FROM {$t} WHERE jsonb_exists({$f}, :key)";
             $sql .= " ORDER BY id LIMIT {$batchSize} OFFSET {$offset}";
             $rows = $conn->execute($sql, ['key' => $attribute])->fetchAll('assoc');
             if ($rows === []) {

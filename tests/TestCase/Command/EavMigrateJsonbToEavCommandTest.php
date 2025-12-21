@@ -15,7 +15,7 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
 
     protected array $fixtures = [
         'plugin.Eav.Attributes',
-        'plugin.Eav.AvString',
+        'plugin.Eav.EavString',
     ];
 
     public static function setUpBeforeClass(): void
@@ -40,14 +40,14 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
             $definitions[] = $schema;
         }
 
-        if (!in_array('av_string_uuid', $existing, true)) {
-            $schema = new TableSchema('av_string_uuid');
+        if (!in_array('eav_string', $existing, true)) {
+            $schema = new TableSchema('eav_string');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('entity_table', ['type' => 'string', 'length' => 191, 'null' => false])
                 ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('val', ['type' => 'string', 'length' => 1024, 'null' => false])
+                ->addColumn('value', ['type' => 'string', 'length' => 1024, 'null' => false])
                 ->addColumn('created', ['type' => 'datetime', 'null' => false])
                 ->addColumn('modified', ['type' => 'datetime', 'null' => false])
                 ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
@@ -78,7 +78,7 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
     {
         parent::setUp();
         $connection = ConnectionManager::get('test');
-        $connection->execute('TRUNCATE attributes, av_string_uuid, test_json_entities');
+        $connection->execute('TRUNCATE attribute_set_attributes, attributes, eav_string, test_json_entities CASCADE');
     }
 
     public function testDryRun(): void
@@ -96,8 +96,8 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
         $this->assertExitSuccess();
         $this->assertOutputContains('Dry run: 1 values would be migrated.');
 
-        $AvString = TableRegistry::getTableLocator()->get('Eav.AvStringUuid');
-        $this->assertSame(0, $AvString->find()->count());
+        $EavString = TableRegistry::getTableLocator()->get('Eav.EavString');
+        $this->assertSame(0, $EavString->find()->count());
     }
 
     public function testMigratesValues(): void
@@ -115,9 +115,9 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
         $this->assertExitSuccess();
         $this->assertOutputContains('Migrated 1 values');
 
-        $AvString = TableRegistry::getTableLocator()->get('Eav.AvStringUuid');
-        $row = $AvString->find()->where(['entity_id' => 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'])->first();
+        $EavString = TableRegistry::getTableLocator()->get('Eav.EavString');
+        $row = $EavString->find()->where(['entity_id' => 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'])->first();
         $this->assertNotEmpty($row);
-        $this->assertSame('blue', $row->val);
+        $this->assertSame('blue', $row->value);
     }
 }
