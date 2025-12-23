@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 use Migrations\AbstractMigration;
 
-class UuidEavSetup extends AbstractMigration
+class EavSetup extends AbstractMigration
 {
     public function change(): void
     {

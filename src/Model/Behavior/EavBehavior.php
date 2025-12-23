@@ -15,6 +15,7 @@ use Cake\ORM\Locator\LocatorAwareTrait;
 use Cake\ORM\Query;
 use Cake\ORM\Table;
 use Cake\Utility\Inflector;
+use Eav\Model\Behavior\JsonColumnStorageTrait;
 use InvalidArgumentException;
 use JsonException;
 use RuntimeException;
@@ -22,6 +23,7 @@ use RuntimeException;
 class EavBehavior extends Behavior
 {
     use LocatorAwareTrait;
+    use JsonColumnStorageTrait;
 
     protected array $_defaultConfig = [
         'entityTable'       => null,   // e.g. 'items'
@@ -29,8 +31,12 @@ class EavBehavior extends Behavior
         'attributeSet'      => null,
         'map'               => [],     // 'field' => ['attribute'=>'name','type'=>'decimal']
         'events'            => ['beforeMarshal'=>true,'afterSave'=>true,'afterFind'=>true],
-        'jsonStorage'       => 'json', // json|jsonb
-        'jsonEncodeOnWrite' => true,   // gate JSON encoding behavior on writes
+        'jsonStorage'       => 'json', // json|jsonb (for JSON Attribute table eav_json)
+        'jsonEncodeOnWrite' => true,   // gate JSON encoding behavior on writes (ignored in JSON Storage Mode)
+        // JSON Storage Mode (entity-level JSONB bundle):
+        'storage'           => 'tables', // 'tables' (default) | 'json_column'
+        'jsonColumn'        => null,     // e.g., 'attrs' or 'spec' when storage=json_column
+        'attributeTypeMap'  => [],       // ['attrName' => 'type'] optional typing hints for JSON Storage
     ];
 
     /** @var array<string,mixed> */
@@ -108,6 +114,63 @@ class EavBehavior extends Behavior
         }
         $map = (array)$this->getConfig('map');
         $entityId = $entity->get('id');
+
+        // JSON Storage Mode: batch update JSON column via jsonb_set for changed keys
+        if ($this->isJsonColumnMode()) {
+            // Determine which fields to persist:
+            // - Prefer explicit map if provided.
+            // - Otherwise, derive from attributeTypeMap (field name == attribute name).
+            $kv = [];
+            if ($map) {
+                foreach ($map as $field => $meta) {
+                    $attribute = (string)($meta['attribute'] ?? $field);
+                    $val = $this->buffer['write'][$field] ?? $entity->get($field);
+                    if ($val === null && !$entity->isDirty($field)) {
+                        continue;
+                    }
+                    $kv[$attribute] = $val;
+                }
+            } else {
+                $typeMap = (array)$this->getConfig('attributeTypeMap');
+                foreach (array_keys($typeMap) as $field) {
+                    $val = $entity->get($field);
+                    if ($val === null && !$entity->isDirty($field)) {
+                        continue;
+                    }
+                    // When dirty with null, we remove the key; when non-dirty null, skip.
+                    $kv[$field] = $val;
+                }
+            }
+
+            if ($kv !== []) {
+                $table = $this->getTable();
+                $conn = $table->getConnection();
+                $tableName = $table->getTable();
+                $alias = $table->getAlias();
+                $pk = (string)current((array)$table->getPrimaryKey());
+                $col = (string)$this->getConfig('jsonColumn');
+                if (!$col) {
+                    throw new RuntimeException('jsonColumn must be configured for JSON Storage Mode.');
+                }
+
+                $expr = $this->buildJsonbSetUpdateSql($conn, $tableName, $col, $kv, $alias);
+
+                // CakePHP 5.x: use updateQuery() and build the expression via UpdateQuery::newExpr()
+                $uq = $conn->updateQuery()->update($tableName);
+                $uq->set([$col => $uq->newExpr($expr['sql'])])
+                   ->where([$pk => $entityId]);
+
+                foreach ($expr['params'] as $p => $v) {
+                    $uq->bind($p, $v, $this->inferPdoType($v));
+                }
+                $uq->execute()->closeCursor();
+            }
+
+            unset($this->buffer['write']);
+            return;
+        }
+
+        // Default table-backed EAV writes
         foreach ($map as $field => $meta) {
             $attribute = $meta['attribute'] ?? $field;
             $type = $meta['type'] ?? 'string';
@@ -121,7 +184,65 @@ class EavBehavior extends Behavior
     }
 
     /**
+     * Project JSON attributes before executing the query (JSON Storage Mode).
+     *
+     * - Appends base table columns first so id and other native fields are present.
+     * - Adds projections for attributes in attributeTypeMap as native aliases for use in ORDER BY and hydration.
+     * - Registers select type map for projected aliases so hydration produces PHP-native types.
+     */
+    public function beforeFind(EventInterface $event, Query $query, \ArrayObject $options, bool $primary): void
+    {
+        if (!$primary || !$this->isJsonColumnMode()) {
+            return;
+        }
+        $typeMap = (array)$this->getConfig('attributeTypeMap');
+        if ($typeMap === []) {
+            return;
+        }
+
+        // Always include base table columns so PK/id and other fields are not dropped.
+        $query->select($this->getTable());
+
+        // Collect select type map for projected aliases
+        $selectTypes = [];
+
+        foreach ($typeMap as $attr => $type) {
+            $projection = $this->buildSelectProjection($query, (string)$attr, (string)$type);
+            $this->applyProjection($query, $projection);
+
+            // Normalize to Cake base types for hydration
+            $normalized = strtolower((string)$type);
+            switch ($normalized) {
+                case 'smallinteger':
+                case 'tinyinteger':
+                case 'biginteger':
+                    $normalized = 'integer';
+                    break;
+                case 'datetimefractional':
+                case 'timestamp':
+                case 'timestampfractional':
+                case 'timestamptimezone':
+                    $normalized = 'datetime';
+                    break;
+                // decimal hydrates as string by design; leave as 'decimal' if used
+                default:
+                    // keep as-is for integer, float, boolean, date, time, datetime, string, json, uuid, etc.
+                    break;
+            }
+            $selectTypes[(string)$attr] = $normalized;
+        }
+
+        // Apply select type map defaults so ORM hydrates projected aliases with correct PHP types
+        if ($selectTypes) {
+            $query->getSelectTypeMap()->addDefaults($selectTypes);
+        }
+    }
+
+    /**
      * Hydrate EAV values into entities after find.
+     *
+     * - Default (tables mode): batch load from eav_* and merge.
+     * - JSON Storage Mode: ensure typed hydration for projected attributes using attributeTypeMap.
      *
      * @param \Cake\Event\EventInterface $event Event.
      * @param \Cake\ORM\Query $query Query.
@@ -134,6 +255,92 @@ class EavBehavior extends Behavior
         if (!$this->getConfig('events')['afterFind'] || !$primary) {
             return;
         }
+
+        // JSON Storage Mode: only cast projected attributes; no eav_* tables involved.
+        if ($this->isJsonColumnMode()) {
+            $typeMap = (array)$this->getConfig('attributeTypeMap');
+            if ($typeMap === []) {
+                return;
+            }
+            $table = $this->getTable();
+            $driver = $table->getConnection()->getDriver();
+
+            $query->formatResults(function (CollectionInterface $results) use ($typeMap, $driver) {
+                if ($results->isEmpty()) {
+                    return $results;
+                }
+                return $results->map(function ($row) use ($typeMap, $driver) {
+                    foreach ($typeMap as $field => $type) {
+                        $val = $row instanceof EntityInterface ? $row->get($field) : ($row[$field] ?? null);
+                        if ($val === null) {
+                            continue;
+                        }
+                        $normalized = strtolower((string)$type);
+
+                        // Deterministic casting for JSON Storage Mode projections
+                        switch ($normalized) {
+                            case 'float':
+                                $cast = is_float($val) ? $val : (is_numeric($val) ? (float)$val : $val);
+                                break;
+                            case 'integer':
+                            case 'smallinteger':
+                            case 'tinyinteger':
+                            case 'biginteger':
+                                $cast = is_int($val) ? $val : (is_numeric($val) ? (int)$val : $val);
+                                break;
+                            case 'boolean':
+                                if (is_bool($val)) {
+                                    $cast = $val;
+                                } elseif (is_string($val)) {
+                                    $lc = strtolower($val);
+                                    $cast = ($val === '1' || $lc === 'true');
+                                } else {
+                                    $cast = (bool)$val;
+                                }
+                                break;
+                            case 'date':
+                                if ($val instanceof Date) {
+                                    $cast = $val;
+                                } elseif (is_string($val)) {
+                                    $cast = Date::parseDate($val) ?? Date::createFromFormat('Y-m-d', $val);
+                                } elseif ($val instanceof \DateTimeInterface) {
+                                    $cast = Date::createFromFormat('Y-m-d', $val->format('Y-m-d'));
+                                } else {
+                                    // Fallback to Cake Type
+                                    $cast = TypeFactory::build('date')->toPHP($val, $driver);
+                                }
+                                break;
+                            case 'datetime':
+                            case 'datetimefractional':
+                            case 'timestamp':
+                            case 'timestampfractional':
+                            case 'timestamptimezone':
+                                $cast = TypeFactory::build('datetime')->toPHP($val, $driver);
+                                break;
+                            case 'time':
+                                $cast = TypeFactory::build('time')->toPHP($val, $driver);
+                                break;
+                            default:
+                                // Use Cake TypeFactory for other types where available
+                                $typeObj = TypeFactory::build($normalized);
+                                $cast = $typeObj ? $typeObj->toPHP($val, $driver) : $val;
+                                break;
+                        }
+
+                        if ($row instanceof EntityInterface) {
+                            $row->set($field, $cast);
+                            $row->setDirty($field, false);
+                        } else {
+                            $row[$field] = $cast;
+                        }
+                    }
+                    return $row;
+                });
+            });
+            return;
+        }
+
+        // Default tables-backed path (existing behavior)
         $map = (array)$this->getConfig('map');
         if (!$map) {
             return;
@@ -228,7 +435,7 @@ class EavBehavior extends Behavior
      */
     protected function tableFor(string $type, ?string $storage = null): \Cake\ORM\Table
     {
-        // Step 2: Try canonical class first; if missing, fall back to a generic Table with explicit eav_<type> name.
+        // Try canonical class first; if missing, fall back to a generic Table with explicit eav_<type> name.
         $segment = $this->tableTypeSegment($type, $storage);
         $fqcn = 'Eav\\Model\\Table\\Eav' . $segment . 'Table';
         if (class_exists($fqcn)) {
@@ -347,7 +554,9 @@ class EavBehavior extends Behavior
         return $out;
     }
 
-    // Example finder
+    /**
+     * Example finder for table-backed EAV.
+     */
     public function findByAttribute(Query $query, array $options): Query
     {
         $attribute = (string)($options['attribute'] ?? '');
@@ -512,6 +721,7 @@ class EavBehavior extends Behavior
                 }
                 return $value;
             case 'json':
+                // Only used for JSON Attribute (eav_json). Ignored in JSON Storage Mode.
                 if (!$this->getConfig('jsonEncodeOnWrite')) {
                     return $value;
                 }
@@ -528,7 +738,7 @@ class EavBehavior extends Behavior
             case 'nativeuuid':
                 return (string)$value;
             case 'fk':
-                // Step 2: FK casting depends on configured pk family
+                // FK casting depends on configured pk family
                 return $this->getConfig('pkType') === 'int' ? (int)$value : (string)$value;
             default:
                 return $value;
@@ -561,6 +771,23 @@ class EavBehavior extends Behavior
             $tableType = 'json';
         }
         return Inflector::camelize($tableType);
+    }
+
+    /**
+     * Provide a getTable() wrapper for CakePHP 5 where Behavior no longer exposes it.
+     *
+     * @return \Cake\ORM\Table
+     */
+    protected function getTable(): Table
+    {
+        // Behavior property is named "table" in newer versions; older versions use "_table".
+        if (property_exists($this, 'table') && $this->table instanceof Table) {
+            return $this->table;
+        }
+        if (property_exists($this, '_table') && $this->_table instanceof Table) {
+            return $this->_table;
+        }
+        throw new RuntimeException('Behavior is not attached to a Table instance.');
     }
 
     /**

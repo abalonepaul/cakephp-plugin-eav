@@ -19,6 +19,18 @@ High-level principles
 - DB-agnostic by default; detect default datasource/driver; guard Postgres-only features automatically.
 - Configuration persistence: save setup answers to a durable configuration (file and/or DB), and stamp migrations/SQL with the chosen settings.
 
+Glossary
+- JSON Attribute: an attribute whose data_type is json, stored in eav_json.value (column type json/jsonb per DB/choice).
+- JSON Storage (Entity JSON bundle): storing all attributes for a single entity row in one JSON/JSONB column in the entity’s own table (e.g., engines.attrs, parts.spec). This is a storage mode alternative to typed EAV tables and is configured per application table via behavior options.
+
+Formatting Guidelines
+- Single-block-per-file MUST
+- Use a single SEARCH/REPLACE block per edited file
+- No mixed full-file + search/replace in the same message
+- No split/continued blocks; ask to continue if too large
+- Add a short mirror in Instructions:
+- “Follow the Formatting Guidelines; they are mandatory.”
+
 Feature 1 — Cleanup/Hardening (Done)
 What’s drifting
 - Value tables and classes currently use Av* and pk suffixes (e.g., av_string_uuid/av_string_int) and class resolution uses pk suffixes: see [EavBehavior#avTableClass](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#avTableClass) and [EavBehavior#pkSuffix](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#pkSuffix).
@@ -133,25 +145,227 @@ Acceptance
 - Setup scaffolds only the selected set (defaults + optional).
 - [EavBehavior#isSupportedType](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#isSupportedType) validates using TypeFactory + custom types.
 
+Summary and Confirmation
+  - Summary of work completed for Feature 2 (Data Type Support + single eav_fk)
+      - Goals met:
+        - Unified custom foreign key type to fk with a single canonical eav_fk table; value type follows chosen PK family (uuid subtype or biginteger).
+        - Setup command now scaffolds only selected types (defaults/all/CSV via --types) with TypeFactory validation and alias normalization (e.g., fk_uuid/fk_int -> fk).
+        - Behavior validates types via TypeFactory plus custom types, resolves tables dynamically when no Eav*Table class exists, and casts fk according to pkType.
+        - JSONB migration command hardened with connection selection, source-table existence guard, and jsonb_exists filter.
+
+  - Key changes
+    - Setup generator
+    - Added --types selection and alias normalization; defaults exclude timestamp (advanced types remain opt-in).
+    - Special-cased fk to emit eav_fk with PK-family value type.
+    - For json, always uses eav_json; column type is json or jsonb per driver/flag.
+    - Updated generator to emit addTimestamps('created','modified') for all eav_* tables to prevent NOT NULL violations when dynamic tables are used without a Timestamp behavior. Regenerate your migration via the command to apply this.
+
+  - Behavior
+    - Added back-compat aliases fk_uuid/fk_int -> fk and support for unified fk in casting.
+    - Dynamic fallback in table resolution (uses a generic Table targeting eav_  when no Eav*Table class exists).
+    - Validation through TypeFactory map and custom 'fk'.
+
+  - JSONB migrator
+    - Added --connection flag and consistent use for reads/writes.
+    - Guards: Postgres-only, verifies source table exists on connection with a clear error if missing.
+    - Uses jsonb_exists with ::jsonb cast for json columns; saves using normalized types.
+
+  - Tests
+    - Added/used JsonEntitiesFixture for source data; stabilized EavMigrateJsonbToEavCommandTest to operate on the test datasource and json_entities table.
+    - Kept setUpBeforeClass bootstraps where other tests depend on schema presence; added missing TableSchema import.
+    - All tests pass.
+
+  - Files touched
+    - Commands
+      - EavSetupCommand.php --types option (defaults|all|CSV); resolveSelectedTypes; fk special-casing in buildMigration; json storage handling; addTimestamps in eav_* loop.
+      - EavCreateAttributeCommand.php normalizeType: jsonb->json; fk_uuid/fk_int->fk; TypeFactory validation.
+      - EavMigrateJsonbToEavCommand.php --connection option; connection-aware table access; source table existence check; jsonb_exists with ::jsonb cast; saves using normalized type.
+
+  - Behavior
+    - EavBehavior.php
+      - typeAliases includes fk_uuid/fk_int -> fk; customTypes includes fk; isSupportedType uses TypeFactory; tableFor dynamic fallback; castValueForType handles fk by pkType.
+
+  - Tables/Entities (no structural changes beyond existing)
+    - EavStringTable.php, EavJsonTable.php AttributesTable.php, Attribute.php
+
+  - Tests and fixtures
+    - JsonEntitiesFixture.php (source json_entities table)
+    - AttributesFixture.php, EavStringFixture.php, EavJsonFixture.php
+    - EavMigrateJsonbToEavCommandTest.php (uses test connection and json_entities; added TableSchema import; kept setUpBeforeClass)
+    - EavCreateAttributeCommandTest.php, EavSetupCommandTest.php
+    - EavBehaviorTest.php
+
+  - Migration
+    The latest committed migration file exists: config/Migrations/20251221070031_eav_setup.php. After updating the generator (EavSetupCommand), regenerate a new migration so eav_* tables use addTimestamps in the loop.
+
+  - Commands executed and expected
+    - Setup (dry-run):
+      - bin/cake eav setup --dry-run --pk-type uuid --uuid-type uuid --json-storage json --connection test
+
+  - Apply migrations to test DB:
+    - bin/cake migrations migrate -p Eav -c test
+  - JSONB migrator (test):
+    - bin/cake eav migrate_jsonb_to_eav json_entities data --attribute color --type string --dry-run --connection test
+    - bin/cake eav migrate_jsonb_to_eav json_entities data --attribute color --type string --connection test
+
+  - PHPUnit:
+    - vendor/bin/phpunit plugins/Eav/tests (or targeted files as needed)
+
+  - Schema and configuration updates
+    - Generator now emits addTimestamps for all eav_* tables (attributes and set tables already used addTimestamps). Regenerate the migration via the setup command; avoid hand-editing generated files.
+    - Unified single eav_fk table; canonical eav_* names used throughout.
+    - Optional: Refresh schema-dump lock files to remove legacy av_* and fk_uuid/fk_int artifacts for clarity.
+
+  - PR checklist (per AGENTS.md)
+    - Work completed:
+      - fk unification, type selection via --types in setup, generator emits addTimestamps in eav_* loop, behavior validation and dynamic resolution, JSONB migrator connection handling and guard.
+
+    - Commands executed:
+      - As listed above (setup dry-run, migrations migrate -p Eav -c test, JSONB migrator, PHPUnit).
+
+    - Table counts added:
+      - Verified in tests (e.g., EavMigrateJsonbToEavCommandTest asserts 1 migrated value in write flow), and unique index present on (entity_table, entity_id, attribute_id).
+    - Schema/config changes:
+      - Canonical eav_* schema; addTimestamps in generator; one eav_fk.
+
 Feature 3 — JSON
-Terminology
-- JSON Attribute: an attribute whose data_type is json. Stored in eav_json.value (column type json or jsonb).
-- JSON Storage (Entity JSON bundle): storing all attributes for a single entity row in one JSON/JSONB column in the entity’s own table. This plugin supports migrating from this bundle to EAV via the JSONB migration command, but EAV tables remain the primary store.
+  - Scope
+    - Postgres-only for this feature.
+    - Engines uses attrs (jsonb), Parts uses spec (jsonb). For the plugin in general, the JSON column name must be configurable per table.
+    - Keep JSON Attribute (eav_json.value) fully supported, but distinct from JSON Storage Mode. We’ll avoid conflating them.
 
-Goals
-- Canonical table eav_json regardless of json/jsonb storage.
-- Setup prompts: JSON column storage (json or jsonb). JSONB only if Postgres; otherwise default to json.
-- Behavior config flag jsonEncodeOnWrite to control write-time encoding for JSON values.
-- The JSONB migration command remains for moving data from bundle storage to EAV values.
+  - Behavior: JSON Storage Mode
+    - Enable via EavBehavior config on an application table: ['storage' => 'json_column', 'jsonColumn' => 'attrs'] or ['jsonColumn' => 'spec'].
+    - Query rewriting: In beforeFind, detect conditions/order/selects that reference EAV attribute names and emit Postgres JSONB expressions:
+      - string: (attrs->>'color') = 'red'
+      - numeric: ((attrs->>'year_start')::int) >= 2010
+      - boolean: ((attrs->>'is_active')::boolean) = true
+      - dates/times: cast using appropriate types when we can resolve type (see “Type resolution”)
 
-Changes
-- [EavBehavior#tableTypeSegment](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#tableTypeSegment): canonicalize json/jsonb to “Json” segment.
-- [EavBehavior#castValueForType](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#castValueForType): gate JSON encoding behind jsonEncodeOnWrite.
-- [EavMigrateJsonbToEavCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php#execute) remains Postgres‑guarded and migrates entity bundle JSONB into EAV values.
+    - Projection as native fields: Inject expressions into SELECT so attributes appear as real entity properties (e.g., SELECT ((attrs->>'year_start')::int) AS year_start). Hydration type-corrected in afterFind via TypeFactory to guarantee PHP-native types for app use.
+    - Magic finders: Cake’s magic finders work because conditions are rewritten (e.g., findByColor, findByYearStart).
+    - Efficient writes: In [beforeSave]/write helpers (file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#saveEavValue), update single keys via jsonb_set instead of rewriting the entire JSON document. Support remove via attrs - 'key'. Parameterize and cast to jsonb correct types.
+    - Indexing guidance:
+    - GIN: CREATE INDEX ON engines USING GIN (attrs);
+    - Functional: CREATE INDEX ON engines (((attrs->>'year_start')::int)); CREATE INDEX ON engines ((attrs->>'color'));
+    - We’ll document these and optionally add helper generation later.
 
-Acceptance
-- eav_json exists with value column of type json or jsonb as selected.
-- Behavior/table resolution unaffected by json/jsonb storage choice.
+  - Type resolution strategy (to satisfy “typed primitives” without mandatory registry)
+    - Priority order:
+    - attributeTypeMap (behavior option): name => type. Quick, explicit, optional.
+    - Attributes table registry: if present for name, use data_type (preferred for precision).
+    - Automatic inference:
+      - If the JSON value is numeric (actual JSON number), treat as integer/float depending on presence of decimal point/precision of comparison value.
+      - If the JSON value is true/false, treat as boolean.
+      - If a query condition is passed a Date/DateTime/Time object, cast accordingly in SQL (date, timestamp, time).
+      - If the condition value is a scalar and matches unambiguous date/time patterns, we can cast cautiously (opt-in toggle to avoid over-eager inference).
+      - Otherwise, default to string.
+      - Caching: We’ll cache resolved types by attribute name per-table to avoid repeated lookups during a request.
+      - Result: Numeric and boolean fields are reliably typed without a registry. Date/time achieve correctness if either the type map/registry exists or the query supplies typed values (e.g., where(['manufactured_at >=' => FrozenDate::today()])).
+
+  - JSON Attribute vs JSON Storage Mode
+    - JSON Attribute: data_type=json stored in eav_json.value. Existing behavior continues. jsonEncodeOnWrite applies here (and only here).
+    - JSON Storage Mode: All attributes live in a single JSONB column (attrs/spec). No eav_json table needed. jsonEncodeOnWrite must be ignored here to prevent double-encoding; we will gate its use by storage mode.
+    - Default: storage => 'tables'. Apps opt-in to JSON Storage Mode per entity table.
+
+  - Setup Command and configuration
+    - Today:
+      - EavSetupCommand remains responsible for EAV tables (including eav_json.value json/jsonb). Keep --json-storage for JSON Attribute (we’ll document the naming to avoid confusion).
+      - New in Feature 3 (lightweight addition, no schema changes to app tables automatically):
+      - We’ll add support to declare JSON Storage Mode targets in the behavior config (per Table) and document how to add/ensure the JSONB column exists in your entity table (attrs/spec).
+      - In a later feature, the command can optionally:
+      - Prompt for JSON Storage Mode per app table and column name(s).
+      - Generate migrations to add jsonb columns if missing (e.g., engines.attrs jsonb default '{}'::jsonb not null).
+      - Column names for ProtechParts:
+      - engines: attrs (jsonb)
+      - parts: spec (jsonb)
+      - We’ll use these in tests for this feature; behavior config will allow per-table override for other apps.
+  - jsonEncodeOnWrite default
+    - Set default to false globally.
+    - Behavior will respect jsonEncodeOnWrite only in “tables storage” for JSON Attribute (eav_json). In JSON Storage Mode, it is ignored to prevent double-encoding. This preserves expectations and avoids regressions.
+
+  - Do we require attributes to be created?
+    - Not required in JSON Storage Mode. We support three resolution paths:
+    - attributeTypeMap (explicit)
+    - attributes registry (preferred for precision when available)
+    - automatic inference for numbers/booleans; date/time when the condition value is typed or matches strict patterns.
+    - Optional setting: autoRegisterUnknownAttributes (future): on save, automatically create missing attributes with inferred type for long-term consistency. Disabled by default; discuss later if desired.
+
+  - Performance and storage: entity JSON column vs single “bundle table”
+    - Option A: Entity table JSONB column (current approach; e.g., engines.attrs, parts.spec)
+      - Pros:
+        - No joins for attribute queries; simpler SQL and ORM integration.
+        - Atomic updates via jsonb_set allow writing a single key without rewriting the entire document.
+        - Functional indexes per “hot” attribute are straightforward:
+          - Example: CREATE INDEX ON engines (((attrs->>'year_start')::int))
+          - Example: CREATE INDEX ON engines ((attrs->>'color'))
+        - GIN index on the column accelerates key existence/containment:
+          - Example: CREATE INDEX ON engines USING GIN (attrs)
+        - Operationally simple: one table to manage, fewer joins to tune.
+      - Cons:
+        - Every entity table carries the JSONB column even if sparse.
+        - Duplicate index strategies may be needed per entity table if many tables use JSON Storage Mode.
+        - Frequent attribute updates can increase write amplification and MVCC bloat on the main table (monitor VACUUM).
+      - Postgres storage/size notes:
+        - Prefer allowing NULL for sparse usage to avoid per-row “{}” overhead; coalesce in projections when needed.
+        - Large JSONB values are TOASTed; if the column isn’t selected, Postgres won’t fetch the out-of-line value.
+        - HOT updates are more likely to break if the JSONB column changes frequently; keep an eye on bloat and autovacuum settings.
+
+    - Option B: Dedicated “bundle” table (plugin-managed), e.g., eav_bundle(entity_table, entity_id, data jsonb)
+      - Pros:
+        - Naturally sparse: only rows with attributes exist—no overhead in base tables.
+        - Isolates churn: heavy attribute updates don’t bloat the main entity tables; reduces lock/contention on hot entities.
+        - Centralized indexing: maintain one GIN index plus functional indexes scoped by entity_table.
+        - Easier to archive or partition attribute data separately.
+      - Cons:
+        - Requires a join in every attribute query; more complex query rewriting and planning.
+        - Still likely to maintain both a GIN index and multiple functional indexes (now on the bundle table).
+        - Slightly more complex behavior logic and migrations.
+
+    - Rule of thumb (Postgres):
+      - If most rows have attributes and attribute reads/filters are common → use the entity JSONB column for simplicity and speed (zero joins).
+      - If attributes are sparse or attributes change very frequently/are very large → use the dedicated bundle table to reduce base-table bloat and contention.
+      - In either case, add:
+        - GIN index on the JSONB document when you need containment/existence.
+        - Targeted functional indexes for hot keys (cast to the correct type: int, boolean, date, etc.).
+
+    - Recommendation for ProtechParts (current state):
+      - Keep entity JSON column mode (attrs/spec) for Feature 3, as it’s already in use and avoids extra joins.
+      - Allow NULL for the column (avoid default '{}'::jsonb) to reduce storage for sparse rows; COALESCE in projections if necessary.
+      - Add a GIN index and targeted functional indexes (e.g., year_start, color) based on actual query patterns.
+      - Reassess if update churn or table bloat becomes significant—then consider introducing a dedicated “json_side_table” backend.
+
+    - Forward compatibility:
+      - We can add a “json_side_table” storage backend later and make storage selectable per table via behavior config.
+      - The behavior design will keep storage backends pluggable so switching is safe and requires minimal app changes.
+
+  - Tests (specific to JSON Storage Mode)
+    - Add fixtures for:
+    - engines: id uuid, attrs jsonb
+    - parts: id uuid, spec jsonb
+
+ - Test cases:
+    - Magic finders and conditions on string: findByColor, where(['color ILIKE' => 're%'])
+    - Numeric compare: where(['year_start >=' => 2010]), orderDesc('year_start')
+    - Boolean: where(['is_active' => true])
+    - Date/time: pass typed values (FrozenDate/FrozenTime) and verify correct filtering and hydration
+    - Hydration types: ensure entity->year_start is int, entity->is_active is bool, entity->manufactured_at is Date/DateTime as applicable
+    - Save single attribute updates JSON via jsonb_set
+    - Keep existing JSONB → EAV migrator tests (json_entities fixture) for the other direction.
+ - Documentation updates (summary)
+   - Clarify terminology: “JSON Attribute” (eav_json) vs “JSON Storage Mode” (entity JSON column).
+   - How to enable JSON Storage Mode in behavior with per-table jsonColumn.
+   - Index recommendations (GIN + functional).
+   - Supported operators and typed casting rules, including how automatic typing works and where hints are needed (dates/times).
+   - Setup command notes: --json-storage is for JSON Attribute; JSON Storage Mode configuration is behavior-based (for now). Future: interactive prompts to add JSONB columns to specified app tables.
+
+ - Acceptance for Feature 3
+   - With ['storage' => 'json_column', 'jsonColumn' => 'attrs'|'spec']:
+   - Magic finders and standard where/order clauses over EAV attribute names work in Postgres with correct types.
+   - Entities expose EAV attributes as native properties with PHP-native types.
+   - Writes use jsonb_set to update single keys atomically.
+   - JSON Attribute (eav_json) behavior and setup are unaffected.
+   - jsonEncodeOnWrite default false globally; ignored in JSON Storage Mode; still respected for JSON Attribute.
 
 Feature 4 — Setup Command (Interactive)
 Goals
@@ -242,6 +456,18 @@ Feature 10 — Documentation
   - Raw SQL vs Migrations options.
 - Maintain a CHANGELOG for notable plan/architecture changes.
 
+Storage modes and when to choose which
+- Typed EAV tables (“tables” storage, default):
+    - Best when attributes are shared across many entities, you need per-attribute constraints/joins, or DB portability matters.
+    - Sparse storage by nature (no empty columns); joins add complexity, but behavior makes fields feel native.
+- JSON Storage (entity JSON column, Postgres-only in Feature 3):
+    - Best when most rows have attributes and you want zero joins with transparent ORM integration.
+    - Use functional indexes per “hot” attribute and a GIN index on the JSONB column.
+    - Allow NULL for sparse tables to avoid per-row “{}” overhead; coalesce in projections as needed.
+- Clear terminology in Setup:
+    - “JSON Attribute column type” is the json/jsonb choice for eav_json.value.
+    - “Storage mode” determines whether attributes live in typed EAV tables (default) or in an entity JSONB column (JSON Storage Mode).
+    -
 Deprecations and removals
 - Remove config/Migrations/*.sql legacy snapshots (regenerate via Setup).
 - Remove Av* classes and av_* fixtures as we migrate; no TableLocator alias needed. Replace all usage with Eav* and eav_*.
