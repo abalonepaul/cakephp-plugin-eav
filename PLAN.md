@@ -344,7 +344,7 @@ Feature 3 — JSON
     - engines: id uuid, attrs jsonb
     - parts: id uuid, spec jsonb
 
- - Test cases:
+  - Test cases:
     - Magic finders and conditions on string: findByColor, where(['color ILIKE' => 're%'])
     - Numeric compare: where(['year_start >=' => 2010]), orderDesc('year_start')
     - Boolean: where(['is_active' => true])
@@ -352,14 +352,14 @@ Feature 3 — JSON
     - Hydration types: ensure entity->year_start is int, entity->is_active is bool, entity->manufactured_at is Date/DateTime as applicable
     - Save single attribute updates JSON via jsonb_set
     - Keep existing JSONB → EAV migrator tests (json_entities fixture) for the other direction.
- - Documentation updates (summary)
+  - Documentation updates (summary)
    - Clarify terminology: “JSON Attribute” (eav_json) vs “JSON Storage Mode” (entity JSON column).
    - How to enable JSON Storage Mode in behavior with per-table jsonColumn.
    - Index recommendations (GIN + functional).
    - Supported operators and typed casting rules, including how automatic typing works and where hints are needed (dates/times).
    - Setup command notes: --json-storage is for JSON Attribute; JSON Storage Mode configuration is behavior-based (for now). Future: interactive prompts to add JSONB columns to specified app tables.
 
- - Acceptance for Feature 3
+  - Acceptance for Feature 3
    - With ['storage' => 'json_column', 'jsonColumn' => 'attrs'|'spec']:
    - Magic finders and standard where/order clauses over EAV attribute names work in Postgres with correct types.
    - Entities expose EAV attributes as native properties with PHP-native types.
@@ -367,8 +367,121 @@ Feature 3 — JSON
    - JSON Attribute (eav_json) behavior and setup are unaffected.
    - jsonEncodeOnWrite default false globally; ignored in JSON Storage Mode; still respected for JSON Attribute.
 
+# Summary: Feature 3 – JSON Storage Mode (EAV in a single JSON/JSONB column)
+
+## Overview
+- Goal: Add a “JSON Storage Mode” to the EAV plugin so all attributes for an entity can be stored in a single JSON/JSONB column on the entity’s table (e.g., Items.attrs, Products.spec) while maintaining typed queries and CakeORM ergonomics.
+  - Preserve existing “JSON Attribute” support (data_type=json in eav_json) and keep typed AV tables (eav_integer, eav_date, etc.) fully functional.
+
+## What was implemented
+
+### Behavior support
+- Added JSON Storage Mode options and logic to the behavior:
+    - `storage=json_column`, `jsonColumn=attrs|spec`
+    - `attributeTypeMap` for typing hints per attribute
+  - Projections and hydration
+      - In `beforeFind`, the behavior:
+          - Appends base table columns (so id and native columns remain available)
+          - Projects JSON attributes as select aliases using Postgres JSONB extraction/casts
+          - Registers the select type map for projected aliases so Cake hydrates as proper PHP-native types (date, float, int, bool)
+  - Typed hydration
+      - In `afterFind`, retained minimal deterministic casting as a safety net; primary typing is now via select type map (Cake-idiomatic)
+  - Writes via jsonb_set
+      - In `afterSave`, updates only changed keys using `jsonb_set`, via `Connection::updateQuery()` (CakePHP 5 API), with a proper `text[]` path cast. Null values remove keys.
+
+### Postgres JSONB helpers
+- New trait encapsulating JSONB expressions, parameter binding, and typing resolution:
+    - `plugins/Eav/src/Model/Behavior/JsonColumnStorageTrait.php`
+  - Key capabilities:
+      - SELECT/ORDER projections inline JSON key as safe SQL literals (avoid binding issues for keys) while identifiers are quoted via driver
+      - WHERE fragments are parameterized and use `jsonb_exists((col)::jsonb, :key)` to avoid conflicts with the `?` operator and maintain PDO compliance
+      - Batch `jsonb_set` updates with path cast to `text[]` and DB-level casting of values (e.g., `to_jsonb(:v::int)`)
+
+### Tests
+- New generic plugin fixtures/tables for JSON Storage Mode:
+    - `plugins/Eav/tests/Fixture/ItemsFixture.php` (items.attrs JSON)
+    - `plugins/Eav/tests/Fixture/ProductsFixture.php` (products.spec JSON)
+    - Existing domain-y fixtures (Engines/Parts) remain in repo but tests use generic Items/Products
+  - JSON Storage Mode test case validates:
+      - String/numeric/boolean queries via safe JSONB expressions
+      - Ordering by projected alias (typed)
+      - Null semantics (missing key)
+      - Hydration types: date → `Cake\I18n\Date`; float/int/bool → native PHP types
+      - `jsonb_set` partial updates on save
+  - Cake 5 compatibility in tests:
+      - Use `Cake\Database\Expression\QueryExpression` (not ORM namespace)
+      - Use `orderByAsc`/`orderByDesc` (replacing deprecated `orderAsc`/`orderDesc`)
+
+### Migrations (tests)
+- Plugin migration for test tables (if used in environment):
+    - `plugins/Eav/config/Migrations/20251223000000_create_json_storage_test_tables.php`
+  - Existing setup migrations for EAV tables remain:
+      - `plugins/Eav/config/Migrations/20251221044219_eav_setup.php`
+      - `plugins/Eav/config/Migrations/20251221093127_uuid_eav_setup.php`
+
+## Key decisions and compliance notes
+- PDO compliance:
+    - WHERE and UPDATE values are bound as named parameters
+    - Avoid Postgres `?` key-existence operator; use `jsonb_exists`
+    - For SELECT/ORDER projections, JSON key (attribute name) is embedded as a safely quoted SQL literal; all values remain parameterized
+  - CakePHP 5.x API usage:
+      - Driver-based identifier quoting (`getDriver()->quoteIdentifier`)
+      - `updateQuery()` for updates; `UpdateQuery::newExpr()` for raw expressions
+      - Select type map for typed hydration
+      - No `Connection::quote`/`quoteIdentifier`; removed `TableRegistry` usage in new code paths; use `getTableLocator()`
+  - JSON Attribute vs JSON Storage Mode:
+      - JSON Attribute (eav_json) continues to work unchanged
+      - JSON Storage Mode is per-table via behavior config; no app schema changes are performed automatically by this feature
+
+## Not included (future features)
+- SetupCommand changes for JSON Storage Mode (interactive prompts/migrations for app columns/indexes) — planned future enhancement
+  - Automatic condition rewriting for attribute names in plain ORM where/magic finders — to be added in a follow-up feature (tests currently use explicit JSONB expressions)
+
+## Files created
+- Behavior helper:
+    - `plugins/Eav/src/Model/Behavior/JsonColumnStorageTrait.php`
+  - Test fixtures (generic):
+      - `plugins/Eav/tests/Fixture/ItemsFixture.php`
+      - `plugins/Eav/tests/Fixture/ProductsFixture.php`
+  - Test migration (optional in your environment):
+      - `plugins/Eav/config/Migrations/20251223000000_create_json_storage_test_tables.php`
+  - Test case:
+      - `plugins/Eav/tests/TestCase/Model/Behavior/EavJsonStorageModeTest.php`
+
+## Files modified
+- Behavior core:
+    - `plugins/Eav/src/Model/Behavior/EavBehavior.php`
+  - Fixtures/tests (updated or referenced):
+      - `plugins/Eav/tests/Fixture/EavStringFixture.php`
+      - `plugins/Eav/tests/Fixture/EavJsonFixture.php`
+      - `plugins/Eav/tests/TestCase/Model/Behavior/EavBehaviorTest.php`
+      - `plugins/Eav/tests/TestCase/Command/EavSetupCommandTest.php`
+  - Migrations (existing EAV setups retained/used as-is):
+      - `plugins/Eav/config/Migrations/20251221044219_eav_setup.php`
+      - `plugins/Eav/config/Migrations/20251221093127_uuid_eav_setup.php`
+
+## Runbook
+- Apply plugin migrations on test connection (if using test migration):
+    - `bin/cake migrations migrate -p Eav -c test`
+  - Run plugin tests:
+      - `vendor/bin/phpunit plugins/Eav/tests`
+
+## Acceptance/Outcomes
+- JSON Storage Mode is available and tested on Postgres:
+    - Entities expose JSON attributes as native fields with correct PHP types
+    - Queries and ordering supported via Postgres JSONB expressions with proper DB casts
+    - Saves update only changed keys via `jsonb_set` with `text[]` path
+  - Existing JSON Attribute and typed AV table paths remain intact
+
+## Follow-ups recommended
+- Implement automatic condition rewriting in EavBehavior (beforeFind) for magic finders and plain `where(['attr >' => 10])` without raw expressions
+  - SetupCommand enhancements for JSON Storage Mode:
+      - Interactive prompts per table/column
+      - Optional migrations to add JSONB columns and indexes (GIN + functional)
+  - Documentation refresh in README for JSON Storage Mode and indexing recommendations
+
 Feature 4 — Setup Command (Interactive)
-Goals
+  Goals
 - Interactive prompts with safe driver-based defaults; minimal flags (flags remain for CI).
 - Prompt flow:
   1) Connection (default datasource; prompt only if multiple).
