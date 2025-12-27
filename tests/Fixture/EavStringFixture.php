@@ -14,7 +14,7 @@ class EavStringFixture extends TestFixture
         'entity_table' => ['type' => 'string', 'length' => 191, 'null' => false],
         'entity_id' => ['type' => 'uuid', 'null' => false],
         'attribute_id' => ['type' => 'uuid', 'null' => false],
-        'value' => ['type' => 'string', 'length' => 1024, 'null' => false],
+        'value' => ['type' => 'string', 'length' => 1024, 'null' => true],
         'created' => ['type' => 'datetime', 'null' => false],
         'modified' => ['type' => 'datetime', 'null' => false],
         '_constraints' => [

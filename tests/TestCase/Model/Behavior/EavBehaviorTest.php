@@ -10,6 +10,8 @@ use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
 use Eav\Model\Behavior\EavBehavior;
+use Cake\Datasource\ConnectionManager;
+use Cake\Database\Schema\TableSchema;
 
 class TestEavBehavior extends EavBehavior
 {
@@ -46,12 +48,12 @@ class EavBehaviorTest extends TestCase
     {
         parent::setUpBeforeClass();
 
-        $connection = \Cake\Datasource\ConnectionManager::get('test');
+        $connection = ConnectionManager::get('test');
         $existing = $connection->getSchemaCollection()->listTables();
         $definitions = [];
 
         if (!in_array('attributes', $existing, true)) {
-            $schema = new \Cake\Database\Schema\TableSchema('attributes');
+            $schema = new TableSchema('attributes');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
@@ -65,13 +67,13 @@ class EavBehaviorTest extends TestCase
         }
 
         if (!in_array('eav_string', $existing, true)) {
-            $schema = new \Cake\Database\Schema\TableSchema('eav_string');
+            $schema = new TableSchema('eav_string');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('entity_table', ['type' => 'string', 'length' => 191, 'null' => false])
                 ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('value', ['type' => 'string', 'length' => 1024, 'null' => false])
+                ->addColumn('value', ['type' => 'string', 'length' => 1024, 'null' => true])
                 ->addColumn('created', ['type' => 'datetime', 'null' => false])
                 ->addColumn('modified', ['type' => 'datetime', 'null' => false])
                 ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
@@ -79,13 +81,13 @@ class EavBehaviorTest extends TestCase
         }
 
         if (!in_array('eav_json', $existing, true)) {
-            $schema = new \Cake\Database\Schema\TableSchema('eav_json');
+            $schema = new TableSchema('eav_json');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('entity_table', ['type' => 'string', 'length' => 191, 'null' => false])
                 ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('value', ['type' => 'json', 'null' => false])
+                ->addColumn('value', ['type' => 'json', 'null' => true])
                 ->addColumn('created', ['type' => 'datetime', 'null' => false])
                 ->addColumn('modified', ['type' => 'datetime', 'null' => false])
                 ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);

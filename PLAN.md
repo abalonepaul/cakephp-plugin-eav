@@ -534,12 +534,144 @@ Feature 6 — Command connection handling
 - Maintain Postgres guard for JSONB in [EavMigrateJsonbToEavCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php#execute).
 
 Feature 7 — Behavior consistency and finder
-- Update resolution to canonical Eav* classes and eav_* tables (no pk suffixing).
+
+Goals
+- Make EAV attributes behave like native fields in queries across both storage modes:
+  - Support Cake magic finders (e.g., findByColor, findByYearStart).
+  - Rewrite attribute conditions, ordering, and projections automatically and safely.
+  - Guarantee typed hydration via Cake’s SelectTypeMap and TypeFactory.
+- Keep the system DB-agnostic where possible; use Postgres-specific JSONB features only in JSON Storage Mode or when using a JSON Attribute.
+
+Scope
+- Applies to both storage modes:
+  - Typed EAV tables (“tables” storage; default).
+  - JSON Storage Mode (“json_column”; Postgres-only per Feature 3).
+- Includes condition rewriting, ordering, projections, and typed hydration.
+- Backward compatible:
+  - Existing [findByAttribute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#findByAttribute) remains available.
+  - Existing JSON Attribute (eav_json.value) path unchanged.
+
+Implementation details
+- Canonical resolution (already in place; reaffirmed here)
   - [EavBehavior#tableTypeSegment](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#tableTypeSegment)
   - [EavBehavior#avTableClass](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#avTableClass)
   - [EavBehavior#tableFor](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#tableFor)
-- Keep unified [EavBehavior#entityIdField](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#entityIdField) as entity_id.
-- Expand [EavBehavior#findByAttribute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#findByAttribute) using ORM expressions; avoid hard-coded SQL operators outside Postgres specifics. Most consumers will use Cake’s magic finders (e.g., findByName).
+  - Unified [EavBehavior#entityIdField](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#entityIdField) = entity_id.
+
+- Automatic condition rewriting (beforeFind)
+  - Parse where() conditions and magic finder conditions that reference attribute names (e.g., ['color' => 'red'], ['year_start >=' => 2010], ['name ILIKE' => '%a%']).
+  - Route per storage mode:
+    - Tables storage: generate a single innerJoin per attribute/type onto the corresponding eav_<type> table with (entity_table, entity_id, attribute_id) constraints. Reuse joins when multiple conditions target the same attribute/type.
+    - JSON Storage Mode: emit Postgres JSONB expressions via helpers in [JsonColumnStorageTrait](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/JsonColumnStorageTrait.php) (->>, casts, jsonb_exists).
+  - Supported operators: =, !=, >, >=, <, <=, IN, NOT IN, LIKE, ILIKE (Postgres), IS NULL, IS NOT NULL.
+  - Type resolution (reused from Feature 3): attributeTypeMap > Attributes registry > inference (numbers/booleans; cautious date/time) to drive SQL casts and hydration.
+
+- Projection and ordering
+  - Project requested attributes as aliased select fields using safe SQL fragments and add select type map entries so Cake hydrates to PHP-native types.
+  - Apply ORDER BY via typed expressions (casted extract for JSON Storage; joined value column for tables storage).
+
+- Safety and portability
+  - Always use ORM expression builders and named parameters; avoid raw concatenation and the Postgres “?” operator. Use jsonb_exists for key existence checks.
+  - Provide a per-query opt-out flag (e.g., options(['eavRewrite' => false])) for advanced callers.
+  - Ensure no N+1 joins: batch join strategy for multiple attributes; reuse join aliases when possible.
+
+- Backward compatibility
+  - [findByAttribute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#findByAttribute) remains supported and internally leverages the same type resolution and storage-mode routing.
+  - Existing explicit maps in behavior config (map) continue to work and can drive which attributes are projected by default.
+
+Tests
+- Tables storage (typed EAV):
+  - Query rewriting: equality, range comparisons, IN/NOT IN, LIKE; IS NULL/NOT NULL.
+  - Ordering by attribute fields (asc/desc).
+  - Typed hydration for integer, float/decimal (string for decimal), boolean, date, datetime, time, uuid.
+  - Multiple attribute conditions ensure single join per attribute/type (no duplicate joins).
+- JSON Storage Mode (Postgres):
+  - Same operator coverage using JSONB expressions (->>, casts).
+  - Ordering by attribute fields via casted expressions.
+  - Typed hydration via SelectTypeMap.
+  - Null/missing key semantics via jsonb_exists.
+- Magic finders:
+  - findBy<Color/YearStart/...> works equivalently in both modes.
+- Opt-out:
+  - When eavRewrite=false, conditions are not rewritten; user-provided raw conditions apply.
+
+Acceptance
+- For both storage modes, the following pass using only native Cake ORM syntax (no raw SQL in app code):
+  - Attribute-based filtering with supported operators produces correct SQL and results.
+  - Attribute-based ORDER BY works and respects type casting.
+  - Returned entities have PHP-native types for projected attributes (per TypeFactory expectations).
+- No duplicate joins for multiple conditions on the same attribute/type in tables storage.
+- JSON Storage Mode uses parameterized JSONB expressions (no “?” operator), and null semantics are correct via jsonb_exists.
+- A per-query opt-out exists and is honored.
+- Existing JSON Attribute and typed EAV paths remain functional and unchanged in behavior.
+
+  - Summary of Feature 7 (Query Rewriting + Projections for EAV)
+ - What was delivered
+   - Unified query rewriting in the behavior:
+   - JSON Storage Mode (entity-level JSON/JSONB column)
+    - Automatic projections so attributes behave like native fields in SELECT/ORDER.
+    - Implemented in beforeFind using buildSelectProjection and applyProjection.
+     - Attribute-based WHERE rewriting for:
+     - Flat array conditions in options: buildWhereFragment + applyWhere
+     - expression-tree conditions added via ->where([...]) and grouped logic: rewriteJsonWhereTree
+     - Typed ORDER BY with default NULLS LAST: buildOrderFragment + applyOrder
+     - Correct WHERE null semantics for absent keys via jsonb_exists
+   - Tables Storage Mode (eav_* AV tables)
+     - One join per attribute/type with deduplication; WHERE rewrite supports =, !=, >, >=, <, <=, IN/NOT IN, LIKE/ILIKE, IS NULL/IS NOT NULL:
+     - Array conditions path in beforeFind
+     - Expression-tree rewrite in rewriteTablesWhereTree
+     - Projections to expose attribute values as select aliases for ORDER/hydration
+     - ORDER BY on attributes with NULLS LAST (native on Postgres, emulation on others) within beforeFind
+   - Per-query controls and safety:
+     - eavRewrite option (default true) to disable rewriting per query at beforeFind
+     - eavTypes option to hint types per query (drives JSON casts and AV table selection)
+     - Collision guard so native columns are never treated as attributes (base schema introspected in beforeFind)
+   - JSON writes and typed hydration retained:
+   - JSON writes via jsonb_set in afterSave using buildJsonbSetUpdateSql
+   - Typed post-hydration for JSON projections in afterFind
+   - Setup generator and migrations:
+   - Generated AV tables now have nullable value columns (aligns with “explicit NULL” rows + missing-row semantics) in the generated migrations (see config/Migrations), produced by EavSetupCommand#buildMigration
+   - Setup command now always prints the connection-specific migrate command in execute
+   - Migration/utility command hardening:
+   - EavMigrateJsonbToEavCommand#execute uses jsonb_exists and supports --connection with dry-run/batching
+
+ - Tests that validate the feature
+   - JSON Storage Mode tests: EavJsonStorageModeTest
+     - String/numeric/boolean/date queries with typed projections and ordering
+     - Where rewriting with plain attribute names (no raw JSONB), including IN and IS NULL semantics
+     - Explicit select(['id','color']) projection and ORDER by attribute alias
+   - Tables Storage Mode tests: EavTablesStorageModeTest
+     - Equality where rewrite (color = 'red'), IS NULL semantics (missing row treated as NULL), ORDER BY with NULLS LAST
+     - Test fixture TestEntitiesFixture and AV fixtures validate join + projection behavior
+   - Behavior infrastructure tests: EavBehaviorTest
+     - Type normalization, casting, batched fetch, and creating attributes on save
+   - Command tests:
+     - EavSetupCommandTest dry-run output
+     - EavCreateAttributeCommandTest create/no-op duplicate flow
+
+ - Acceptance criteria vs goals
+   - AC: “EAV attributes act like native fields in queries” (where/order/select) across both storage modes
+   - Met. JSON: alias projections + typed WHERE/ORDER rewrite. Tables: joins + projections + ORDER rewrite.
+   - AC: “Per-query opt-out and typing overrides”
+   - Met via options(['-eavRewrite' => false]) and options(['eavTypes' => ['attr' => 'type']]) in beforeFind
+   - AC: “Null semantics consistent”
+   - Met. JSON uses jsonb_exists for missing-key-as-NULL; Tables uses LEFT JOIN + value IS NULL; AV “value” columns are nullable.
+   - AC: “Ordering NULLS LAST by default”
+   - Met. JSON adds NULLS LAST in buildOrderFragment; Tables enforces at beforeFind (native on Postgres; emulated elsewhere).
+   - AC: “No native column collisions”
+   - Met. Collision guard prevents attribute rewriting for base table columns.
+   - AC: “Generator and commands support production workflows”
+   - Met. Setup command generates nullable AV value columns and prints connection-aware migrate command; migration utility hardened for Postgres JSONB.
+
+ - Notable implementation details
+   - Type resolution precedence: behavior map/attributeTypeMap > eavTypes (per-query) > Attributes registry > inference > default 'string'
+   - Safe parameter binding everywhere (no string concatenation of values)
+   - Deduplicated joins per attribute/type alias in tables storage
+   - Centralized select type normalization via normalizeSelectType
+
+ - Outcome
+   - All plugin tests pass locally against Postgres with PHP 8.1, validating JSON and tables storage modes, command behavior, and setup generation.
+   - Feature 7’s goals are achieved; the behavior now makes EAV attributes first-class citizens in ORM query building with sensible defaults and escape hatches.
 
 Feature 8 — Tests
 - Rename fixtures from av_* to eav_*; switch ‘val’ to ‘value’; ensure unified entity_id across fixtures.

@@ -6,6 +6,9 @@ namespace Eav\Test\TestCase\Command;
 use Cake\Console\TestSuite\ConsoleIntegrationTestTrait;
 use Cake\TestSuite\TestCase;
 
+/**
+ * @uses \Eav\Command\EavSetupCommand
+ */
 class EavSetupCommandTest extends TestCase
 {
     use ConsoleIntegrationTestTrait;
