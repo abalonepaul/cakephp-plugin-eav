@@ -2347,7 +2347,7 @@ class EavBehavior extends Behavior
                             $ident = $e->getIdentifier();
                         }
                     });
-                    // Default to IS NULL for unary field checks
+                    // Default to IS NULL for   unary field checks
                     $sqlOp = 'IS NULL';
 
                     if (is_string($ident) && $ident !== '' && !str_contains($ident, '.') && !isset($nativeColumns[$ident])) {

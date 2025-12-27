@@ -30,6 +30,9 @@ class EavSetupInteractiveCommand extends Command
      */
     public function runInteractive(ConsoleIo $io): int
     {
+        // Initialize defaults to prevent undefined notices before prompts
+        $jsonEncodeOnWrite = false;
+
         // 1) Choose connection
         $configured = ConnectionManager::configured();
         $defaultIdx = array_search('default', $configured, true);
@@ -191,11 +194,44 @@ class EavSetupInteractiveCommand extends Command
         $setup = new EavSetupCommand();
         $types = $setup->resolveSelectedTypes($typesCsv);
 
-        // 7) Migration name
-        $migrationName = (string)$io->ask('Migration class name', 'EavSetup');
+        // 7) Migration/SQL name
+        $migrationName = (string)$io->ask('Migration class name (also used as base name for SQL output)', 'EavSetup');
 
-        // 8) Persist eav.json
+        // 8) Summary and confirmation before writing files
         $jsonColumnsForJson = $jsonColumns !== [] ? $jsonColumns : new \stdClass(); // {} when empty
+        $summary = [
+            'connection' => $connName,
+            'driver' => get_class($driver),
+            'outputMode' => $outputMode,
+            'pkType' => $pkType,
+            'uuidType' => $uuidType,
+            'jsonAttributeStorage' => $jsonStorage,
+            'jsonEncodeOnWrite' => $jsonEncodeOnWrite ? 'true' : 'false',
+            'storageDefault' => $storageDefault,
+            'jsonColumns' => $jsonColumns ?: [],
+            'types' => $types,
+            'migrationName' => $migrationName,
+        ];
+
+        $io->out('');
+        $io->out('Summary:');
+        foreach ($summary as $k => $v) {
+            if ($k === 'types') {
+                $io->out(sprintf('  - %s: %s', $k, implode(',', (array)$v)));
+            } elseif ($k === 'jsonColumns') {
+                $io->out(sprintf('  - %s: %s', $k, $v ? json_encode($v) : '{}'));
+            } else {
+                $io->out(sprintf('  - %s: %s', $k, is_array($v) ? json_encode($v) : (string)$v));
+            }
+        }
+        $io->out('');
+        $proceed = $io->askChoice('Proceed with generation?', ['yes', 'no'], 'yes') === 'yes';
+        if (!$proceed) {
+            $io->out('Aborted by user. No files were written.');
+            return CommandInterface::CODE_SUCCESS;
+        }
+
+        // Persist eav.json after confirmation
         $config = [
             'connection' => $connName,
             'driver' => get_class($driver),
@@ -203,7 +239,7 @@ class EavSetupInteractiveCommand extends Command
             'pkType' => $pkType,
             'uuidType' => $uuidType,
             'jsonAttributeStorage' => $jsonStorage,
-            'jsonEncodeOnWrite' => false,
+            'jsonEncodeOnWrite' => ($jsonEncodeOnWrite ?? false),
             'storageDefault' => $storageDefault,
             'jsonColumns' => $jsonColumnsForJson,
             'types' => $types,
@@ -224,17 +260,123 @@ class EavSetupInteractiveCommand extends Command
             }
         }
 
-        // 8) Generation (raw_sql path will fall back for now)
-        if ($outputMode === 'raw_sql') {
-            if (!($driver instanceof Postgres) && !($driver instanceof Mysql)) {
-                $io->warning('Raw SQL is supported only for Postgres/MySQL at this time. Falling back to Migrations.');
-            } else {
-                $io->warning('Raw SQL DDL emission will be provided in the next step. Falling back to Migrations for now.');
+        // 9) Generation
+        if ($outputMode === 'raw_sql' && (($driver instanceof Postgres) || ($driver instanceof Mysql))) {
+            // Build base EAV DDL
+            $sql = $setup->buildRawSql($migrationName, $pkType, $uuidType, $jsonStorage, $types, $driver);
+
+            // Append JSON Storage SQL if selected
+            if (!empty($jsonColumns) && $storageDefault === 'json_column') {
+                $io->out('Configuring JSON Storage DDL in SQL output ...');
+                $pgIndexSpec = [];
+                if ($driver instanceof Postgres) {
+                    foreach ($jsonColumns as $t => $col) {
+                        $io->out(sprintf('Index options for %s.%s (Postgres):', $t, $col));
+                        $gin = $io->askChoice(' - Add GIN index on the JSONB column?', ['yes', 'no'], 'no') === 'yes';
+                        $keysCsv = (string)$io->ask(' - Functional indexes (CSV of keys to index, blank to skip)', '');
+                        $keys = array_values(array_filter(array_map('trim', explode(',', $keysCsv))));
+                        $pgIndexSpec[$t] = ['gin' => $gin, 'keys' => $keys];
+                    }
+                }
+
+                $sql .= "\n-- JSON Storage columns\n";
+                foreach ($jsonColumns as $tableName => $columnName) {
+                    // Only emit ALTER TABLE when a new column was requested
+                    if (!empty($jsonColumnsNew[$tableName])) {
+                        $colType = ($driver instanceof Postgres) ? 'JSONB' : 'JSON';
+                        $sql .= "ALTER TABLE {$tableName} ADD COLUMN {$columnName} {$colType} NULL;\n";
+                    }
+                    if ($driver instanceof Postgres) {
+                        $spec = $pgIndexSpec[$tableName] ?? ['gin' => false, 'keys' => []];
+                        if (!empty($spec['gin'])) {
+                            $ginIdx = "idx_{$tableName}_{$columnName}_gin";
+                            $sql .= "CREATE INDEX IF NOT EXISTS {$ginIdx} ON {$tableName} USING GIN ({$columnName});\n";
+                        }
+                        if (!empty($spec['keys'])) {
+                            foreach ($spec['keys'] as $key) {
+                                $safeKey = preg_replace('/[^a-z0-9_]+/i', '_', strtolower($key));
+                                $fnIdx = "idx_{$tableName}_{$columnName}_key_{$safeKey}";
+                                $sql .= "CREATE INDEX IF NOT EXISTS {$fnIdx} ON {$tableName} ((({$columnName} ->> '{$key}')));\n";
+                            }
+                        }
+                    } else {
+                        $sql .= "-- MySQL: functional indexes on JSON are limited; skipping index creation for {$tableName}.{$columnName}\n";
+                    }
+                    $sql .= "\n";
+                }
             }
+
+            // Header and write to Sql directory
+            $header = "-- EAV Setup SQL\n"
+                . "-- connection: {$connName}\n"
+                . "-- driver: " . get_class($driver) . "\n"
+                . "-- pkType: {$pkType}\n"
+                . "-- uuidType: {$uuidType}\n"
+                . "-- jsonAttributeStorage: {$jsonStorage}\n"
+                . "-- storageDefault: {$storageDefault}\n"
+                . "-- jsonColumns: " . ($jsonColumns ? json_encode($jsonColumns) : '{}') . "\n"
+                . "-- types: " . implode(',', $types) . "\n"
+                . "-- generatedAt: " . gmdate('c') . "\n\n";
+            $sql = $header . $sql;
+
+            $sqlDir = $setup->sqlOutputPath();
+            if (!is_dir($sqlDir) && !mkdir($sqlDir, 0775, true) && !is_dir($sqlDir)) {
+                $io->err('Unable to create SQL output directory: ' . $sqlDir);
+                return CommandInterface::CODE_ERROR;
+            }
+            $driverTag = ($driver instanceof Postgres) ? 'postgres' : 'mysql';
+            $sqlFile = $setup->nextSqlFilename($sqlDir, $migrationName, $driverTag);
+
+            if (file_put_contents($sqlFile, $sql) === false) {
+                $io->err('Unable to write SQL file: ' . $sqlFile);
+                return CommandInterface::CODE_ERROR;
+            }
+
+            $io->success('SQL written: ' . $sqlFile);
+
+            // Persist rawSql pointer into eav.json for future reference
+            if (isset($configPath) && is_string($configPath) && $configPath !== '' && file_exists($configPath)) {
+                try {
+                    $rawCfg = file_get_contents($configPath);
+                    $cfgArr = $rawCfg !== false ? json_decode((string)$rawCfg, true, 512, JSON_THROW_ON_ERROR) : null;
+                    if (is_array($cfgArr)) {
+                        $cfgArr['rawSql'] = [
+                            'driver' => ($driver instanceof Postgres) ? 'postgres' : 'mysql',
+                            'file' => $sqlFile,
+                        ];
+                        $ok = (bool)file_put_contents($configPath, json_encode($cfgArr, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                        if ($ok) {
+                            $io->out('Updated config with rawSql pointer: ' . $configPath);
+                        } else {
+                            $io->warning('Failed to update rawSql in config file: ' . $configPath);
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $io->warning('Unable to update rawSql in config: ' . $e->getMessage());
+                }
+            }
+
+            $io->out('Apply this SQL using your DB client (psql/mysql).');
+            return CommandInterface::CODE_SUCCESS;
         }
 
-        // Delegate to the migration builder in EavSetupCommand
+        // Default: delegate to the migration builder in EavSetupCommand
         $payload = $setup->buildMigration($migrationName, $pkType, $uuidType, $jsonStorage, $types);
+
+        // Stamp a header summarizing the selections (same format as non-interactive)
+        $header = "/**\n"
+            . " * EAV Setup Migration\n"
+            . " * connection: {$connName}\n"
+            . " * driver: " . get_class($driver) . "\n"
+            . " * pkType: {$pkType}\n"
+            . " * uuidType: {$uuidType}\n"
+            . " * jsonAttributeStorage: {$jsonStorage}\n"
+            . " * storageDefault: {$storageDefault}\n"
+            . " * jsonColumns: " . ($jsonColumns ? json_encode($jsonColumns) : '{}') . "\n"
+            . " * types: " . implode(',', $types) . "\n"
+            . " * generatedAt: " . gmdate('c') . "\n"
+            . " */\n\n";
+        $payload = str_replace("declare(strict_types=1);\n\n", "declare(strict_types=1);\n\n" . $header, $payload);
 
         $path = $setup->migrationPath();
         if (!is_dir($path) && !mkdir($path, 0775, true) && !is_dir($path)) {

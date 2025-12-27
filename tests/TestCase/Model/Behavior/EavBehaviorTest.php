@@ -162,7 +162,7 @@ class EavBehaviorTest extends TestCase
         $this->assertInstanceOf(Time::class, $time);
 
         $json = $this->behavior->exposeCastValue('json', ['a' => 1]);
-        $this->assertSame('{"a":1}', $json);
+        $this->assertSame(['a' => 1], $json);
     }
 
     public function testFetchEavValuesBatchLoadsAttributes(): void

@@ -90,8 +90,14 @@ class EavSetupCommand extends Command
             return $wizard->runInteractive($io);
         }
 
-        // "Magic" launch when invoked with no options and no --no-interactive
-        if (!$explicitNoInteractive && !$explicitInteractive && $configPathOpt === '') {
+        // "Magic" launch when invoked with no options and no --no-interactive.
+        // Never auto-launch during --dry-run, to keep ConsoleIntegrationTestTrait flows non-interactive.
+        if (
+            !$explicitNoInteractive
+            && !$explicitInteractive
+            && $configPathOpt === ''
+            && !$args->getOption('dry-run')
+        ) {
             $argv = $_SERVER['argv'] ?? [];
             $passedOptions = 0;
             foreach ($argv as $a) {
@@ -235,6 +241,27 @@ class EavSetupCommand extends Command
                 }
 
                 $io->out('SQL written: ' . $sqlFile);
+                // If a config path was provided, persist the rawSql pointer into eav.json for future reference.
+                if ($configPathOpt !== '') {
+                    try {
+                        $raw = file_get_contents($configPathOpt);
+                        $cfg = $raw !== false ? json_decode((string)$raw, true, 512, JSON_THROW_ON_ERROR) : null;
+                        if (is_array($cfg)) {
+                            $cfg['rawSql'] = [
+                                'driver' => $isPg ? 'postgres' : 'mysql',
+                                'file' => $sqlFile,
+                            ];
+                            $written = (bool)file_put_contents($configPathOpt, json_encode($cfg, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                            if ($written) {
+                                $io->out('Updated config with rawSql pointer: ' . $configPathOpt);
+                            } else {
+                                $io->warning('Failed to update rawSql in config file: ' . $configPathOpt);
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        $io->warning('Unable to update rawSql in config: ' . $e->getMessage());
+                    }
+                }
                 $io->success('Review and apply this SQL using your DB client (psql/mysql).');
                 return CommandInterface::CODE_SUCCESS;
             }

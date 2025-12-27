@@ -31,7 +31,7 @@ Formatting Guidelines
 - Add a short mirror in Instructions:
 - “Follow the Formatting Guidelines; they are mandatory.”
 
-Feature 1 — Cleanup/Hardening (Done)
+## Feature 1 — Cleanup/Hardening (Done)
 What’s drifting
 - Value tables and classes currently use Av* and pk suffixes (e.g., av_string_uuid/av_string_int) and class resolution uses pk suffixes: see [EavBehavior#avTableClass](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#avTableClass) and [EavBehavior#pkSuffix](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#pkSuffix).
 - JSONB naming drift in class/name composition (Json vs Jsonb): [EavBehavior#tableTypeSegment](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#tableTypeSegment).
@@ -126,7 +126,7 @@ Confirmation against acceptance
   Attributes/AttributeSets tables remain unprefixed and the join table remains attribute_set_attributes by design; prefixing is scheduled in Feature 5 (see plugins/Eav/PLAN.md).
   Configuration persistence to plugins/Eav/config/eav.json and interactive setup are planned for Feature 4; not required in Feature 1."
 
-Feature 2 — Data Type Support
+## Feature 2 — Data Type Support
 Goals
 - Support all CakePHP TypeFactory types + custom ‘fk’.
 - Default set most apps need; advanced types are opt-in via interactive Setup.
@@ -228,7 +228,7 @@ Summary and Confirmation
     - Schema/config changes:
       - Canonical eav_* schema; addTimestamps in generator; one eav_fk.
 
-Feature 3 — JSON
+## Feature 3 — JSON
   - Scope
     - Postgres-only for this feature.
     - Engines uses attrs (jsonb), Parts uses spec (jsonb). For the plugin in general, the JSON column name must be configurable per table.
@@ -367,15 +367,15 @@ Feature 3 — JSON
    - JSON Attribute (eav_json) behavior and setup are unaffected.
    - jsonEncodeOnWrite default false globally; ignored in JSON Storage Mode; still respected for JSON Attribute.
 
-# Summary: Feature 3 – JSON Storage Mode (EAV in a single JSON/JSONB column)
+### Summary: Feature 3 – JSON Storage Mode (EAV in a single JSON/JSONB column)
 
-## Overview
+#### Overview
 - Goal: Add a “JSON Storage Mode” to the EAV plugin so all attributes for an entity can be stored in a single JSON/JSONB column on the entity’s table (e.g., Items.attrs, Products.spec) while maintaining typed queries and CakeORM ergonomics.
   - Preserve existing “JSON Attribute” support (data_type=json in eav_json) and keep typed AV tables (eav_integer, eav_date, etc.) fully functional.
 
-## What was implemented
+#### What was implemented
 
-### Behavior support
+##### Behavior support
 - Added JSON Storage Mode options and logic to the behavior:
     - `storage=json_column`, `jsonColumn=attrs|spec`
     - `attributeTypeMap` for typing hints per attribute
@@ -389,7 +389,7 @@ Feature 3 — JSON
   - Writes via jsonb_set
       - In `afterSave`, updates only changed keys using `jsonb_set`, via `Connection::updateQuery()` (CakePHP 5 API), with a proper `text[]` path cast. Null values remove keys.
 
-### Postgres JSONB helpers
+##### Postgres JSONB helpers
 - New trait encapsulating JSONB expressions, parameter binding, and typing resolution:
     - `plugins/Eav/src/Model/Behavior/JsonColumnStorageTrait.php`
   - Key capabilities:
@@ -397,7 +397,7 @@ Feature 3 — JSON
       - WHERE fragments are parameterized and use `jsonb_exists((col)::jsonb, :key)` to avoid conflicts with the `?` operator and maintain PDO compliance
       - Batch `jsonb_set` updates with path cast to `text[]` and DB-level casting of values (e.g., `to_jsonb(:v::int)`)
 
-### Tests
+##### Tests
 - New generic plugin fixtures/tables for JSON Storage Mode:
     - `plugins/Eav/tests/Fixture/ItemsFixture.php` (items.attrs JSON)
     - `plugins/Eav/tests/Fixture/ProductsFixture.php` (products.spec JSON)
@@ -412,14 +412,14 @@ Feature 3 — JSON
       - Use `Cake\Database\Expression\QueryExpression` (not ORM namespace)
       - Use `orderByAsc`/`orderByDesc` (replacing deprecated `orderAsc`/`orderDesc`)
 
-### Migrations (tests)
+##### Migrations (tests)
 - Plugin migration for test tables (if used in environment):
     - `plugins/Eav/config/Migrations/20251223000000_create_json_storage_test_tables.php`
   - Existing setup migrations for EAV tables remain:
       - `plugins/Eav/config/Migrations/20251221044219_eav_setup.php`
       - `plugins/Eav/config/Migrations/20251221093127_uuid_eav_setup.php`
 
-## Key decisions and compliance notes
+#### Key decisions and compliance notes
 - PDO compliance:
     - WHERE and UPDATE values are bound as named parameters
     - Avoid Postgres `?` key-existence operator; use `jsonb_exists`
@@ -433,11 +433,11 @@ Feature 3 — JSON
       - JSON Attribute (eav_json) continues to work unchanged
       - JSON Storage Mode is per-table via behavior config; no app schema changes are performed automatically by this feature
 
-## Not included (future features)
+#### Not included (future features)
 - SetupCommand changes for JSON Storage Mode (interactive prompts/migrations for app columns/indexes) — planned future enhancement
   - Automatic condition rewriting for attribute names in plain ORM where/magic finders — to be added in a follow-up feature (tests currently use explicit JSONB expressions)
 
-## Files created
+#### Files created
 - Behavior helper:
     - `plugins/Eav/src/Model/Behavior/JsonColumnStorageTrait.php`
   - Test fixtures (generic):
@@ -448,7 +448,7 @@ Feature 3 — JSON
   - Test case:
       - `plugins/Eav/tests/TestCase/Model/Behavior/EavJsonStorageModeTest.php`
 
-## Files modified
+#### Files modified
 - Behavior core:
     - `plugins/Eav/src/Model/Behavior/EavBehavior.php`
   - Fixtures/tests (updated or referenced):
@@ -460,27 +460,27 @@ Feature 3 — JSON
       - `plugins/Eav/config/Migrations/20251221044219_eav_setup.php`
       - `plugins/Eav/config/Migrations/20251221093127_uuid_eav_setup.php`
 
-## Runbook
+#### Runbook
 - Apply plugin migrations on test connection (if using test migration):
     - `bin/cake migrations migrate -p Eav -c test`
   - Run plugin tests:
       - `vendor/bin/phpunit plugins/Eav/tests`
 
-## Acceptance/Outcomes
+#### Acceptance/Outcomes
 - JSON Storage Mode is available and tested on Postgres:
     - Entities expose JSON attributes as native fields with correct PHP types
     - Queries and ordering supported via Postgres JSONB expressions with proper DB casts
     - Saves update only changed keys via `jsonb_set` with `text[]` path
   - Existing JSON Attribute and typed AV table paths remain intact
 
-## Follow-ups recommended
+#### Follow-ups recommended
 - Implement automatic condition rewriting in EavBehavior (beforeFind) for magic finders and plain `where(['attr >' => 10])` without raw expressions
   - SetupCommand enhancements for JSON Storage Mode:
       - Interactive prompts per table/column
       - Optional migrations to add JSONB columns and indexes (GIN + functional)
   - Documentation refresh in README for JSON Storage Mode and indexing recommendations
 
-Feature 4 — Setup Command (Interactive)
+## Feature 4 — Setup Command (Interactive)
 
 Goals
 - Provide an interactive setup wizard with driver-aware defaults and minimal required flags (flags remain for CI).
@@ -591,7 +591,122 @@ Tests (to add with implementation)
   - MySQL raw SQL generation sanity (header, tables present).
   - SQL Server/SQLite paths show fallback notice and write a migration.
 
-Feature 5 — EavEntities / EavAttributes / EavAttributeSets
+### Feature 4 — Interactive Setup Command (Completed Summary)
+
+Overview
+- Implemented an interactive setup wizard that guides configuration and generates schema via migrations or raw SQL.
+- Preserved non-interactive usage for CI and scripts, with “magic” interactive launch when no flags are provided (except during --dry-run).
+- Persisted selections to plugins/Eav/config/eav.json and added header stamps to generated files.
+
+Highlights
+- New interactive command: eav setup:interactive
+- Auto-launch wizard from eav setup when no key flags are provided (unless --no-interactive or --dry-run).
+- Non-interactive flags extended with:
+    - --config: load options from eav.json
+    - --output: migrations|raw_sql (raw_sql supported for Postgres/MySQL; others fall back to migrations)
+- Raw SQL output generation for Postgres/MySQL, including header metadata
+- JSON Storage Mode (json_column) support in the wizard:
+    - Per-table mapping and optional migration/SQL to add JSON/JSONB columns (GIN/functional indexes optional on Postgres)
+- jsonEncodeOnWrite prompt added; default false globally
+
+Interactive Wizard Flow
+1) Choose connection (lists configured connections; default to “default” when available).
+2) Choose output mode: migrations (default) or raw_sql (Postgres/MySQL supported; SQL Server/SQLite fall back to migrations with a notice).
+3) PK family: uuid or int; if uuid, choose subtype with driver-aware recommendation:
+    - Postgres/SQL Server: nativeuuid (recommended)
+    - MySQL/MariaDB: binaryuuid (recommended)
+    - SQLite: uuid (string) (recommended)
+4) JSON Attribute storage for eav_json.value: json or jsonb (jsonb only when Postgres; otherwise falls back to json).
+5) Default behavior storage: tables or json_column.
+6) JSON Storage Mode per-table (when json_column selected):
+    - Enumerate app tables; allow multi-select by number.
+    - For each table: choose an existing JSON column or type a new column name (normalized).
+    - Optionally generate a migration or raw SQL to add the column; Postgres supports optional GIN and functional indexes.
+7) jsonEncodeOnWrite for JSON Attribute writes (applies to tables mode only).
+8) Types to scaffold: defaults, all, or CSV with alias normalization and TypeFactory validation.
+9) Migration/SQL base name (default EavSetup).
+10) Summary confirmation and generation.
+
+Persistence (eav.json)
+- plugins/Eav/config/eav.json stores:
+    - connection, driver
+    - outputMode (migrations|raw_sql)
+    - pkType, uuidType
+    - jsonAttributeStorage (json|jsonb)
+    - jsonEncodeOnWrite (boolean)
+    - storageDefault (tables|json_column)
+    - jsonColumns mapping: { "table": "jsonColumn" }
+    - types (normalized)
+    - migrationName
+    - generatedAt (ISO8601)
+    - For raw_sql runs: rawSql { driver, file }
+
+Output Modes
+- Migrations (default):
+    - Delegates to EavSetupCommand to generate a Cake Migration with canonical eav_* tables:
+        - attributes, attribute_sets, attribute_set_attributes
+        - eav_* typed tables with: id, entity_table, entity_id, attribute_id, value (nullable), created, modified
+        - Unique index (entity_table, entity_id, attribute_id), FK attribute_id -> attributes(id) ON DELETE CASCADE
+    - Header summary injected (connection, driver, pk/uuid/json options, types, generatedAt)
+- Raw SQL (Postgres/MySQL):
+    - Generates canonical DDL with header summary
+    - SQL Server/SQLite: fall back to migrations with notice
+    - Wizard also appends JSON Storage column/index DDL (where applicable) to the SQL snapshot
+
+Non-Interactive Enhancements
+- --config to load eav.json options for deterministic runs
+- --output migrations|raw_sql (honored for Postgres/MySQL)
+- Magic interactive launch is skipped during --dry-run to keep test/CI non-interactive
+
+Backward Compatibility
+- Flag-based usage preserved; interactive “magic” only when no key flags and not a dry run
+- Postgres-only behavior for jsonb and ILIKE is guarded
+- Migrations remain the default path for portability
+
+Acceptance (met)
+- bin/cake eav setup launches the wizard when no flags (unless --no-interactive or --dry-run). Explicit wizard: bin/cake eav setup:interactive.
+- eav.json is written with all choices (including jsonColumns, jsonEncodeOnWrite).
+- Migrations are generated with header stamps and canonical schema; raw SQL snapshot is generated for Postgres/MySQL and recorded in eav.json.
+- JSON Storage Mode per-table mapping supported; optional migration/SQL generated to add JSON columns and optional Postgres indexes.
+
+Files Changed
+- New
+    - plugins/Eav/src/Command/EavSetupInteractiveCommand.php
+- Modified
+    - plugins/Eav/src/Command/EavSetupCommand.php
+        - Added --interactive/--no-interactive and magic launch (skipped during --dry-run)
+        - Added --config and --output (migrations|raw_sql)
+        - Implemented raw SQL generator for Postgres/MySQL
+        - Header stamping for migrations and raw SQL
+    - plugins/Eav/src/EavPlugin.php
+        - Registered eav setup:interactive command
+    - plugins/Eav/src/Model/Behavior/EavBehavior.php
+        - Default jsonEncodeOnWrite flipped to false (aligned with feature decisions)
+- Tests Created/Updated
+    - plugins/Eav/tests/TestCase/Command/EavSetupCommandTest.php (expanded)
+        - testMigrationDryRunOutputsMigration
+        - testRawSqlDryRunOnSupportedDrivers
+        - testConfigFileRespectedForOutputModeAndTypes
+    - plugins/Eav/tests/TestCase/Model/Behavior/EavBehaviorTest.php (updated)
+        - Aligned JSON expectation with jsonEncodeOnWrite=false default
+
+Runbook
+- Interactive wizard:
+    - bin/cake eav setup
+    - bin/cake eav setup:interactive
+- Non-interactive (migrations):
+    - bin/cake eav setup --connection default --pk-type uuid --uuid-type nativeuuid --json-storage json --types defaults
+- Non-interactive (raw SQL):
+    - bin/cake eav setup --connection default --output raw_sql --pk-type uuid --uuid-type nativeuuid --json-storage json --types defaults
+- Apply migrations:
+    - bin/cake migrations migrate -p Eav -c <connection>
+
+Future Work
+- Refactor to a SetupWizard service to share logic between commands (agreed roadmap).
+- Add interactive command tests (planned in Feature 8).
+- Documentation updates (README/PLAN) with screenshots and usage examples.
+
+## Feature 5 — EavEntities / EavAttributes / EavAttributeSets
 Goals
 - Prefix model classes and tables to avoid collisions and keep grouping.
   - Tables: eav_entities, eav_attributes, eav_attribute_sets, eav_attribute_set_attributes
@@ -605,12 +720,12 @@ Goals
 Acceptance
 - Bake CRUD for EavAttributes, EavAttributeSets, EavAttributeSetAttributes, and EavEntities.
 
-Feature 6 — Command connection handling
+## Feature 6 — Command connection handling
 - Auto-detect default datasource; prompt if multiple.
 - Keep optional flags for CI but not required for interactive use.
 - Maintain Postgres guard for JSONB in [EavMigrateJsonbToEavCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php#execute).
 
-Feature 7 — Behavior consistency and finder
+## Feature 7 — Behavior consistency and finder
 
 Goals
 - Make EAV attributes behave like native fields in queries across both storage modes:
@@ -750,14 +865,14 @@ Acceptance
    - All plugin tests pass locally against Postgres with PHP 8.1, validating JSON and tables storage modes, command behavior, and setup generation.
    - Feature 7’s goals are achieved; the behavior now makes EAV attributes first-class citizens in ORM query building with sensible defaults and escape hatches.
 
-Feature 8 — Tests
+## Feature 8 — Tests
 - Rename fixtures from av_* to eav_*; switch ‘val’ to ‘value’; ensure unified entity_id across fixtures.
 - Update tests that assumed AvJsonbUuid class naming (canonicalize to EavJson).
 - Add tests for interactive Setup (simulated answers), UUID subtype recommendations, and type selection.
 - Add CRUD tests for EavAttributes/EavAttributeSets/EavEntities.
 - Add regression coverage for jsonEncodeOnWrite true/false.
 
-Feature 9 — UI scaffolding (bake)
+## Feature 9 — UI scaffolding (bake)
 - Bake CRUD for:
   - EavAttributes
   - EavAttributeSets
@@ -766,7 +881,7 @@ Feature 9 — UI scaffolding (bake)
 - Basic forms for adding attributes and organizing sets per entity.
 - Controller/View route naming can follow plugin defaults; no additional “Eav” prefix in URLs is required beyond the plugin name (Eav).
 
-Feature 10 — Documentation
+## Feature 10 — Documentation
 - Rewrite README with:
   - Overview and capabilities (no 2.x migration notes).
   - Setup walkthrough (interactive prompts) with examples.
@@ -843,3 +958,182 @@ Driver-based UUID recommendations (used in Setup)
 - MySQL/MariaDB: binaryuuid (Recommended)
 - SQL Server: nativeuuid (Recommended)
 - SQLite: uuid (string) (Recommended)
+
+## Feature 11 — Interactive Setup Command Service (Convert Feature 4 to a Service)
+
+Architecture (Exploratory; multiple competing approaches)
+
+Objective
+- Extract all setup logic (prompting, defaults, validation, generation, persistence) from the console commands into a reusable, testable service layer.
+- Keep commands thin; both non-interactive and interactive commands delegate to the service.
+- Maintain backward compatibility with existing CLI flags and eav.json while improving testability and cohesion.
+
+Scope
+- Create a service layer under namespace Eav\Setup that:
+  - Owns DTO(s) for configuration and generation inputs/outputs (e.g., SetupConfig).
+  - Encapsulates driver-aware defaults, type selection and normalization, config persistence (plugins/Eav/config/eav.json), header-stamp composition, and output writing (migrations and raw SQL).
+  - Exposes a single orchestration entrypoint called by both commands.
+- Non-goals for Feature 11:
+  - Adding new DB vendors or features beyond Feature 4. This is a refactor to centralize logic.
+
+Existing entry points to refactor
+- Interactive wizard: [EavSetupInteractiveCommand#runInteractive](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupInteractiveCommand.php#runInteractive)
+- Non-interactive path and raw SQL generation: [EavSetupCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#execute)
+- Helpers to eventually migrate into the service:
+  - Type resolution: [resolveSelectedTypes](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#resolveSelectedTypes)
+  - Migration builder: [buildMigration](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#buildMigration)
+  - SQL generator: [buildRawSql](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#buildRawSql)
+  - File output helpers: [migrationPath](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#migrationPath), [nextMigrationFilename](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#nextMigrationFilename), [sqlOutputPath](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#sqlOutputPath), [nextSqlFilename](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#nextSqlFilename)
+
+Approach A — Keep logic in commands; add a lightweight utility class
+- Structure:
+  - Extract only config read/write and header stamping to a small helper; keep buildMigration/buildRawSql in commands.
+  - Interactive command remains responsible for prompting.
+- Pros:
+  - Minimal refactor; lower risk.
+- Cons:
+  - Does not solve cohesion or testability: core generation remains in commands.
+  - Duplicate logic risks persist.
+
+Approach B — Single “Wizard” wrapper that invokes existing commands internally
+- Structure:
+  - A Wizard facade that composes CLI argument lists and internally dispatches the existing commands via a runner.
+- Pros:
+  - Minimal code churn; reuses existing stable command flows.
+- Cons:
+  - Commands remain the source of truth; poor unit-test targeting.
+  - Harder to validate internal states without CLI indirection.
+
+Approach C — Dedicated service layer (recommended)
+- Structure:
+  - New service namespace Eav\Setup with components:
+    - SetupConfig (immutable DTO): user selections and derived values.
+    - SetupDefaults: driver-aware defaults (PK family, UUID subtype, JSON storage).
+    - TypeResolver: alias normalization and validation against TypeFactory + custom types.
+    - DriverCapabilities: DB vendor capabilities (jsonb, uuid type, etc.).
+    - ConfigRepository: read/write eav.json with schema validation.
+    - HeaderBuilder: builds migration/SQL header summary.
+    - MigrationBuilder: produces migration payload (moves code from command builder).
+    - SqlGenerator: DDL for Postgres/MySQL (moves code from command builder).
+    - OutputWriter: writes migration or SQL files (uniform path and naming).
+    - WizardPrompter: wraps ConsoleIo for prompts (interactive only).
+  - Commands:
+    - [EavSetupInteractiveCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupInteractiveCommand.php): prompts via WizardPrompter, builds SetupConfig, calls service orchestrator.
+    - [EavSetupCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php): parses flags/--config, builds SetupConfig, calls service orchestrator; retains magic launch (but prompting lives in service prompter).
+- Pros:
+  - High cohesion, unit-testable components.
+  - Single source of truth for generation across modes (migrations/raw SQL).
+  - Clean path to extend (SQL Server/SQLite) without altering commands.
+- Cons:
+  - Largest initial refactor; risk of regressions if not covered by tests.
+  - Requires careful BC shims for existing public helpers on commands.
+
+Cross-cutting concerns and trade-offs
+- IO Abstraction: Prompter must be injectable/mocked for tests. Commands pass ConsoleIo, service uses WizardPrompter interface.
+- Backward Compatibility: Keep CLI options/behavior identical; commands remain entrypoints; public helpers in commands proxy to service and get marked deprecated.
+- Config precedence: CLI flags > eav.json values > driver defaults. Service must apply merging deterministically.
+- Error handling: Service components throw precise exceptions; commands translate to exit codes and friendly messages.
+- File system: WSL path/write errors; service returns write results and messages; commands print guidance on failure.
+- Risks and mitigations:
+  - Risk: Dual code paths drifting. Mitigation: single orchestration service; commands call service only.
+  - Risk: Tests flapping due to driver differences. Mitigation: driver capability adapter + golden outputs in tests.
+  - Risk: Timing-based filenames in tests. Mitigation: allow injecting a Clock or prefix stub for deterministic filenames during tests (optional).
+
+Recommendation
+- Adopt Approach C (service layer). Keep commands as thin adapters and retain flags/UX. Introduce service components with unit tests.
+
+Planning (Converged; step-by-step)
+
+Decision
+- Implement Approach C. Retain current commands for UX/BC, but delegate logic to the service.
+
+Deliverables
+- New namespace/classes under plugins/Eav/src/Setup:
+  - SetupConfig (DTO)
+  - SetupDefaults
+  - TypeResolver
+  - DriverCapabilities
+  - ConfigRepository
+  - HeaderBuilder
+  - MigrationBuilder
+  - SqlGenerator
+  - OutputWriter (MigrationWriter, SqlWriter combined)
+  - WizardPrompter (interactive only; wraps ConsoleIo)
+  - SetupOrchestrator (facade): build config, validate, generate payload, write outputs, update eav.json rawSql pointer
+- Command refactors:
+  - [EavSetupInteractiveCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupInteractiveCommand.php): replace ad-hoc logic with WizardPrompter + Orchestrator.
+  - [EavSetupCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php): parse flags/--config, build SetupConfig, call Orchestrator; keep magic launch, but wizard lives in service.
+
+Implementation plan
+1) Introduce the core DTO and helpers
+   - SetupConfig: immutable config; includes connection, driver FQCN, outputMode, pkType, uuidType, jsonAttributeStorage, jsonEncodeOnWrite, storageDefault, jsonColumns map, types, migrationName, generatedAt.
+   - SetupDefaults: derive driver-aware recommendations and normalize from inputs.
+   - DriverCapabilities: feature flags per driver (jsonb, uuid native, binaryuuid viability, functional index limits).
+   - TypeResolver: normalize/validate types (aliases + TypeFactory/custom); reuse Feature 4 logic.
+
+2) Add persistence and headers
+   - ConfigRepository: read/write plugins/Eav/config/eav.json; merge with CLI/map; update rawSql pointer after write.
+   - HeaderBuilder: compose consistent headers (used in both migration and raw SQL outputs).
+
+3) Factor generation into services
+   - MigrationBuilder: move [buildMigration](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#buildMigration) logic; accept SetupConfig; return full PHP payload (string).
+   - SqlGenerator: move [buildRawSql](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#buildRawSql); accept SetupConfig; return SQL string; keep Postgres/MySQL guards.
+
+4) Output writers
+   - OutputWriter: centralize path resolution and naming (migrations/Sql). Move [migrationPath](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#migrationPath), [nextMigrationFilename](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#nextMigrationFilename), [sqlOutputPath](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#sqlOutputPath), [nextSqlFilename](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#nextSqlFilename) into this class.
+
+5) Orchestration and interactive prompts
+   - WizardPrompter: encapsulate all ask* methods; return a SetupConfig; remains driver-aware and handles JSON Storage per-table mapping + optional index prompts.
+   - SetupOrchestrator: given a SetupConfig, build generation payload (migration or SQL), prepend header, write files through OutputWriter, and persist eav.json via ConfigRepository (including rawSql pointer).
+
+6) Refactor commands to the service
+   - [EavSetupInteractiveCommand#runInteractive](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupInteractiveCommand.php#runInteractive): use WizardPrompter + Orchestrator; remove direct filesystem and build calls.
+   - [EavSetupCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#execute): parse options/--config; create SetupConfig; call Orchestrator; retain magic interactive launch gate.
+
+7) Deprecations and BC
+   - Keep public helpers in [EavSetupCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php) as shims that delegate to service (resolveSelectedTypes, buildMigration, buildRawSql, path methods). Add @deprecated tags and removal note for the next major plugin release.
+   - Ensure outputs are byte-for-byte compatible with Feature 4 (headers, filenames, directory structure).
+
+8) Tests (part of this feature)
+   - Unit tests for SetupDefaults, TypeResolver, DriverCapabilities, ConfigRepository, HeaderBuilder, MigrationBuilder, SqlGenerator, OutputWriter.
+   - Command tests remain; update to assert commands call through and produce same outputs (dry-run assertions unchanged).
+   - Add minimal WizardPrompter tests with stubbed IO (no full interactive flow; full interactive tests remain slated for Feature 8).
+
+9) Docs/plan updates
+   - Update PLAN and README (later feature) to describe the service layer and note deprecations on command helpers.
+
+Rejected options (and why)
+- Trait-based sharing:
+  - Pros: Fastest; no object graph overhead.
+  - Cons: Encourages duplication and poor encapsulation; hard to test in isolation. Rejected due to maintainability.
+- Subcommand/task-based shell composition:
+  - Pros: Natural split per concern (ask/generate/write).
+  - Cons: Still couples logic to Console stack; test isolation remains weaker vs service classes. Rejected in favor of pure services.
+
+Risks and mitigations
+- Regression risk during extraction:
+  - Mitigation: Build high-coverage unit tests around service components; keep command tests intact; migrate incrementally (interactive command → non-interactive).
+- Divergence risk (commands vs service):
+  - Mitigation: Commands call the Orchestrator exclusively; remove duplicated logic from commands (or leave as deprecated proxies).
+- Environment differences (WSL paths, write permissions):
+  - Mitigation: OutputWriter returns detailed results; commands present friendly messages; dry-run modes stay deterministic.
+
+Milestones
+- M1: Introduce SetupConfig, SetupDefaults, DriverCapabilities, TypeResolver; unit tests.
+- M2: Add ConfigRepository, HeaderBuilder; unit tests.
+- M3: Extract MigrationBuilder and SqlGenerator; OutputWriter; unit tests.
+- M4: Add SetupOrchestrator and WizardPrompter; refactor Interactive command; pass tests.
+- M5: Refactor non-interactive command to Orchestrator; deprecation shims; pass all tests.
+- M6: Documentation update (in Feature 10).
+
+Runbook (unchanged for users)
+- Interactive: bin/cake eav setup (magic) or bin/cake eav setup:interactive
+- Non-interactive: bin/cake eav setup --config plugins/Eav/config/eav.json --output migrations|raw_sql --dry-run
+- Apply migrations: bin/cake migrations migrate -p Eav -c <connection>
+
+Acceptance (for Feature 11)
+- Commands delegate exclusively to the service layer (no business logic retained in commands).
+- Byte-for-byte identical outputs for the same inputs compared to Feature 4 (headers, filenames, layout).
+- eav.json persistence and rawSql pointer updates are performed by ConfigRepository.
+- Public helper methods on EavSetupCommand exist as shims and are marked deprecated.
+- Unit tests cover new service components; command tests remain green without changes to their assertions.
