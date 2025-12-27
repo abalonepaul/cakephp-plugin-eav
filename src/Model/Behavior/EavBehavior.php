@@ -43,7 +43,7 @@ class EavBehavior extends Behavior
         'map'               => [],     // 'field' => ['attribute'=>'name','type'=>'decimal']
         'events'            => ['beforeMarshal'=>true,'afterSave'=>true,'afterFind'=>true],
         'jsonStorage'       => 'json', // json|jsonb (for JSON Attribute table eav_json)
-        'jsonEncodeOnWrite' => true,   // gate JSON encoding behavior on writes (ignored in JSON Storage Mode)
+        'jsonEncodeOnWrite' => false,  // default false per PLAN; ignored in JSON Storage Mode
         // JSON Storage Mode (entity-level JSONB bundle):
         'storage'           => 'tables', // 'tables' (default) | 'json_column'
         'jsonColumn'        => null,     // e.g., 'attrs' or 'spec' when storage=json_column

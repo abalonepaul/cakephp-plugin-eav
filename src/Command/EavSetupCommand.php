@@ -119,6 +119,7 @@ class EavSetupCommand extends Command
         $migrationName = (string)($args->getOption('name') ?: 'EavSetup');
 
         // Optional: load config JSON (--config)
+        $outputMode = (string)($args->getOption('output') ?? 'migrations');
         if ($configPathOpt !== '') {
             $path = $configPathOpt;
             if (!is_file($path)) {
@@ -142,6 +143,7 @@ class EavSetupCommand extends Command
             $uuidType = strtolower((string)($cfg['uuidType'] ?? $uuidType));
             $jsonStorage = strtolower((string)($cfg['jsonAttributeStorage'] ?? $jsonStorage));
             $migrationName = (string)($cfg['migrationName'] ?? $migrationName);
+            $outputMode = (string)($cfg['outputMode'] ?? $outputMode);
         }
 
         // Validate core choices
@@ -181,7 +183,64 @@ class EavSetupCommand extends Command
             $types = $this->resolveSelectedTypes($typesArg);
         }
 
-        // Build migration payload
+        // Choose output mode
+        $outputMode = strtolower($outputMode) === 'raw_sql' ? 'raw_sql' : 'migrations';
+
+        if ($outputMode === 'raw_sql') {
+            $isPg = $driver instanceof \Cake\Database\Driver\Postgres;
+            $isMy = $driver instanceof \Cake\Database\Driver\Mysql;
+
+            if (!$isPg && !$isMy) {
+                $io->warning('Raw SQL output is currently supported for Postgres/MySQL only. Falling back to migrations.');
+            } else {
+                // Build SQL payload
+                $sql = $this->buildRawSql(
+                    $migrationName,
+                    $pkType,
+                    $uuidType,
+                    $jsonStorage,
+                    $types,
+                    $driver
+                );
+
+                // Stamp header
+                $header = "-- EAV Setup SQL\n"
+                    . "-- connection: {$connectionName}\n"
+                    . "-- driver: " . get_class($driver) . "\n"
+                    . "-- pkType: {$pkType}\n"
+                    . "-- uuidType: {$uuidType}\n"
+                    . "-- jsonAttributeStorage: {$jsonStorage}\n"
+                    . "-- types: " . implode(',', $types) . "\n"
+                    . "-- generatedAt: " . gmdate('c') . "\n\n";
+                $sql = $header . $sql;
+
+                $sqlDir = $this->sqlOutputPath();
+                $sqlFile = $this->nextSqlFilename($sqlDir, $migrationName, $isPg ? 'postgres' : 'mysql');
+
+                if ($dryRun) {
+                    $io->out('Dry run - SQL not written.');
+                    $io->out('Target: ' . $sqlFile);
+                    $io->out($sql);
+                    return CommandInterface::CODE_SUCCESS;
+                }
+
+                if (!is_dir($sqlDir) && !mkdir($sqlDir, 0775, true) && !is_dir($sqlDir)) {
+                    $io->err('Unable to create SQL output directory: ' . $sqlDir);
+                    return CommandInterface::CODE_ERROR;
+                }
+
+                if (file_put_contents($sqlFile, $sql) === false) {
+                    $io->err('Unable to write SQL file: ' . $sqlFile);
+                    return CommandInterface::CODE_ERROR;
+                }
+
+                $io->out('SQL written: ' . $sqlFile);
+                $io->success('Review and apply this SQL using your DB client (psql/mysql).');
+                return CommandInterface::CODE_SUCCESS;
+            }
+        }
+
+        // Fallback or chosen mode: Migrations
         $payload = $this->buildMigration(
             $migrationName,
             $pkType,
@@ -468,6 +527,180 @@ PHP;
         return $base;
     }
 
+    /**
+     * Directory for raw SQL output snapshots.
+     */
+    public function sqlOutputPath(): string
+    {
+        return dirname(__DIR__, 2) . '/config/Sql';
+    }
+
+    /**
+     * Next SQL filename for the given base name and driver tag.
+     */
+    public function nextSqlFilename(string $path, string $name, string $driverTag): string
+    {
+        $timestamp = date('YmdHis');
+        $base = $path . '/' . $timestamp . '_' . Inflector::underscore($name) . '_' . strtolower($driverTag) . '.sql';
+        $counter = 0;
+        while (file_exists($base)) {
+            $counter++;
+            $base = $path . '/' . $timestamp . '_' . Inflector::underscore($name) . '_' . strtolower($driverTag) . "_{$counter}.sql";
+        }
+
+        return $base;
+    }
+
+    /**
+     * Build Raw SQL DDL for Postgres/MySQL.
+     *
+     * @param string $name
+     * @param string $pkType uuid|int
+     * @param string $uuidType uuid|binaryuuid|nativeuuid
+     * @param string $jsonStorage json|jsonb
+     * @param array<string> $types
+     * @param object $driver
+     * @return string
+     */
+    public function buildRawSql(
+        string $name,
+        string $pkType,
+        string $uuidType,
+        string $jsonStorage,
+        array $types,
+        object $driver
+    ): string {
+        $isPg = $driver instanceof \Cake\Database\Driver\Postgres;
+        $isMy = $driver instanceof \Cake\Database\Driver\Mysql;
+
+        // Vendor-specific type mappers
+        $mapUuidCol = function (string $uuidType) use ($isPg, $isMy): string {
+            if ($isPg) {
+                return 'UUID';
+            }
+            if ($isMy) {
+                return ($uuidType === 'binaryuuid') ? 'BINARY(16)' : 'CHAR(36)';
+            }
+            return 'UUID';
+        };
+        $mapEntityId = function (string $pkType, string $uuidType) use ($mapUuidCol): string {
+            return $pkType === 'int' ? 'BIGINT' : $mapUuidCol($uuidType);
+        };
+        $mapVarchar = function (int $len = 191) use ($isPg): string {
+            return 'VARCHAR(' . $len . ')';
+        };
+        $mapTimestamp = function () use ($isPg, $isMy): string {
+            return $isMy ? 'DATETIME' : 'TIMESTAMP';
+        };
+        $mapValueType = function (string $type, string $jsonStorage) use ($isPg, $isMy, $mapVarchar): string {
+            $t = strtolower($type);
+            return match ($t) {
+                'string' => $mapVarchar(1024),
+                'char' => 'CHAR(255)',
+                'text' => 'TEXT',
+                'integer' => 'INTEGER',
+                'smallinteger' => 'SMALLINT',
+                'tinyinteger' => $isMy ? 'TINYINT' : 'SMALLINT',
+                'biginteger' => 'BIGINT',
+                'float' => $isMy ? 'DOUBLE' : 'DOUBLE PRECISION',
+                'decimal' => 'DECIMAL(18,6)',
+                'boolean' => 'BOOLEAN',
+                'date' => 'DATE',
+                'datetime', 'timestamp', 'datetimefractional', 'timestampfractional', 'timestamptimezone' => $isMy ? 'DATETIME' : 'TIMESTAMP',
+                'time' => 'TIME',
+                'binary' => 'BYTEA',
+                'uuid', 'binaryuuid', 'nativeuuid' => $isMy && $t === 'binaryuuid' ? 'BINARY(16)' : ($isMy ? 'CHAR(36)' : 'UUID'),
+                'json' => ($jsonStorage === 'jsonb' && !$isMy) ? 'JSONB' : 'JSON',
+                default => 'TEXT',
+            };
+        };
+
+        $idCol = $mapUuidCol($uuidType);
+        $entityIdCol = $mapEntityId($pkType, $uuidType);
+        $jsonType = ($jsonStorage === 'jsonb' && !$isMy) ? 'JSONB' : 'JSON';
+        $tsCol = $mapTimestamp();
+
+        // Build list of eav_* table DDLs based on selected types
+        $buildTableName = fn(string $t) => 'eav_' . strtolower($t);
+        $emitTable = function (string $table, string $valueType) use ($idCol, $entityIdCol, $mapVarchar, $tsCol, $isPg): string {
+            $lines = [];
+            $lines[] = "CREATE TABLE IF NOT EXISTS {$table} (";
+            $lines[] = "  id {$idCol} NOT NULL,";
+            $lines[] = "  entity_table " . $mapVarchar(191) . " NOT NULL,";
+            $lines[] = "  entity_id {$entityIdCol} NOT NULL,";
+            $lines[] = "  attribute_id {$idCol} NOT NULL,";
+            $lines[] = "  value {$valueType} NULL,";
+            $lines[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+            $lines[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+            $lines[] = "  PRIMARY KEY (id)";
+            $lines[] = ");";
+            $lines[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_{$table}_lookup ON {$table} (entity_table, entity_id, attribute_id);";
+            // PG add FK with ON DELETE CASCADE; MySQL can do the same
+            $lines[] = "ALTER TABLE {$table} ADD CONSTRAINT fk_{$table}_attribute_id FOREIGN KEY (attribute_id) REFERENCES attributes(id) ON DELETE CASCADE;";
+            return implode("\n", $lines) . "\n";
+        };
+
+        // Attributes core tables
+        $ddl = [];
+        $ddl[] = "-- Core attribute registry tables";
+        $ddl[] = "CREATE TABLE IF NOT EXISTS attributes (";
+        $ddl[] = "  id {$idCol} NOT NULL,";
+        $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
+        $ddl[] = "  label " . $mapVarchar(255) . " NULL,";
+        $ddl[] = "  data_type " . $mapVarchar(50) . " NOT NULL,";
+        $ddl[] = "  options JSON NOT NULL,";
+        $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  PRIMARY KEY (id)";
+        $ddl[] = ");";
+        $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_attributes_name ON attributes (name);";
+        $ddl[] = "";
+
+        $ddl[] = "CREATE TABLE IF NOT EXISTS attribute_sets (";
+        $ddl[] = "  id {$idCol} NOT NULL,";
+        $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
+        $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  PRIMARY KEY (id)";
+        $ddl[] = ");";
+        $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_attribute_sets_name ON attribute_sets (name);";
+        $ddl[] = "";
+
+        $ddl[] = "CREATE TABLE IF NOT EXISTS attribute_set_attributes (";
+        $ddl[] = "  attribute_set_id {$idCol} NOT NULL,";
+        $ddl[] = "  attribute_id {$idCol} NOT NULL,";
+        $ddl[] = "  position INTEGER DEFAULT 0,";
+        $ddl[] = "  PRIMARY KEY (attribute_set_id, attribute_id)";
+        $ddl[] = ");";
+        $ddl[] = "ALTER TABLE attribute_set_attributes ADD CONSTRAINT fk_asa_set_id FOREIGN KEY (attribute_set_id) REFERENCES attribute_sets(id) ON DELETE CASCADE;";
+        $ddl[] = "ALTER TABLE attribute_set_attributes ADD CONSTRAINT fk_asa_attr_id FOREIGN KEY (attribute_id) REFERENCES attributes(id) ON DELETE CASCADE;";
+        $ddl[] = "";
+
+        // Determine which EAV tables to create
+        $tables = [];
+        foreach ($types as $type) {
+            $t = strtolower($type);
+            if ($t === 'fk') {
+                $tables['eav_fk'] = $mapEntityId($pkType, $uuidType);
+                continue;
+            }
+            // Ensure json maps to json/jsonb for value
+            if ($t === 'json') {
+                $tables['eav_json'] = $jsonType;
+                continue;
+            }
+            // For known types, map to vendor-appropriate
+            $tables[$buildTableName($t)] = $mapValueType($t, $jsonStorage);
+        }
+
+        $ddl[] = "-- EAV typed value tables";
+        foreach ($tables as $table => $valueType) {
+            $ddl[] = $emitTable($table, $valueType);
+        }
+
+        return implode("\n", $ddl);
+    }
+
     public function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser
     {
         $parser->addOption('pk-type', ['help' => 'Primary key type: uuid|int', 'default' => 'uuid']);
@@ -482,6 +715,11 @@ PHP;
         $parser->addOption('interactive', ['help' => 'Launch interactive setup wizard', 'boolean' => true, 'default' => false]);
         $parser->addOption('no-interactive', ['help' => 'Force non-interactive behavior (no wizard)', 'boolean' => true, 'default' => false]);
         $parser->addOption('config', ['help' => 'Path to eav.json to load options from (non-interactive)', 'default' => null]);
+        // Feature 4: output mode
+        $parser->addOption('output', [
+            'help' => 'Output mode: migrations|raw_sql (raw_sql supported for Postgres/MySQL only)',
+            'default' => 'migrations',
+        ]);
 
         return $parser;
     }
