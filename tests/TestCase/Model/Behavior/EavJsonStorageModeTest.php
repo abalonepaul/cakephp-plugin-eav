@@ -21,7 +21,6 @@ class EavJsonStorageModeTest extends TestCase
         'plugin.Eav.Items',
         'plugin.Eav.Products',
     ];
-
     private Table $Items;
     private Table $Products;
 
@@ -224,5 +223,61 @@ class EavJsonStorageModeTest extends TestCase
         $q = $this->whereJsonKey($this->Items, $q, 'attrs', 'color', '=', 'green');
         $found = $q->all()->extract('id')->toArray();
         $this->assertContains($item->id, $found);
+    }
+
+    public function testWhereRewritingEqualityAndNulls(): void
+    {
+        // color = 'red' -> Alpha
+        $rows = $this->Items->find()
+            ->where(['color' => 'red'])
+            ->all()
+            ->extract('id')
+            ->toList();
+        $this->assertSame(['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'], $rows);
+
+        // color IS NULL -> Beta (missing key treated as NULL)
+        $rowsNull = $this->Items->find()
+            ->where(['color IS' => null])
+            ->all()
+            ->extract('id')
+            ->toList();
+        $this->assertSame(['bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'], $rowsNull);
+    }
+
+    public function testWhereRewritingInOperator(): void
+    {
+        $ids = $this->Items->find()
+            ->where(['color IN' => ['red', 'blue']])
+            ->all()
+            ->extract('id')
+            ->toList();
+        sort($ids);
+        $this->assertSame(
+            ['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'cccccccc-cccc-cccc-cccc-cccccccccccc'],
+            $ids
+        );
+    }
+
+    public function testOrderRewritingAndProjection(): void
+    {
+        // ORDER BY year_start DESC with NULLS LAST behavior where applicable
+        $ordered = $this->Items->find()
+            ->orderBy(['year_start' => 'DESC'])
+            ->all()
+            ->extract('id')
+            ->toList();
+
+        $this->assertSame([
+            'cccccccc-cccc-cccc-cccc-cccccccccccc', // 2015
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', // 2010
+            'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', // 2005
+        ], $ordered);
+
+        // Explicit select of attribute alias works without raw JSON
+        $row = $this->Items->find()
+            ->select(['id', 'color'])
+            ->where(['id' => 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'])
+            ->firstOrFail();
+        $this->assertSame('red', $row->color);
     }
 }

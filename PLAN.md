@@ -534,12 +534,76 @@ Feature 6 — Command connection handling
 - Maintain Postgres guard for JSONB in [EavMigrateJsonbToEavCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php#execute).
 
 Feature 7 — Behavior consistency and finder
-- Update resolution to canonical Eav* classes and eav_* tables (no pk suffixing).
+
+Goals
+- Make EAV attributes behave like native fields in queries across both storage modes:
+  - Support Cake magic finders (e.g., findByColor, findByYearStart).
+  - Rewrite attribute conditions, ordering, and projections automatically and safely.
+  - Guarantee typed hydration via Cake’s SelectTypeMap and TypeFactory.
+- Keep the system DB-agnostic where possible; use Postgres-specific JSONB features only in JSON Storage Mode or when using a JSON Attribute.
+
+Scope
+- Applies to both storage modes:
+  - Typed EAV tables (“tables” storage; default).
+  - JSON Storage Mode (“json_column”; Postgres-only per Feature 3).
+- Includes condition rewriting, ordering, projections, and typed hydration.
+- Backward compatible:
+  - Existing [findByAttribute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#findByAttribute) remains available.
+  - Existing JSON Attribute (eav_json.value) path unchanged.
+
+Implementation details
+- Canonical resolution (already in place; reaffirmed here)
   - [EavBehavior#tableTypeSegment](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#tableTypeSegment)
   - [EavBehavior#avTableClass](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#avTableClass)
   - [EavBehavior#tableFor](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#tableFor)
-- Keep unified [EavBehavior#entityIdField](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#entityIdField) as entity_id.
-- Expand [EavBehavior#findByAttribute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#findByAttribute) using ORM expressions; avoid hard-coded SQL operators outside Postgres specifics. Most consumers will use Cake’s magic finders (e.g., findByName).
+  - Unified [EavBehavior#entityIdField](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#entityIdField) = entity_id.
+
+- Automatic condition rewriting (beforeFind)
+  - Parse where() conditions and magic finder conditions that reference attribute names (e.g., ['color' => 'red'], ['year_start >=' => 2010], ['name ILIKE' => '%a%']).
+  - Route per storage mode:
+    - Tables storage: generate a single innerJoin per attribute/type onto the corresponding eav_<type> table with (entity_table, entity_id, attribute_id) constraints. Reuse joins when multiple conditions target the same attribute/type.
+    - JSON Storage Mode: emit Postgres JSONB expressions via helpers in [JsonColumnStorageTrait](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/JsonColumnStorageTrait.php) (->>, casts, jsonb_exists).
+  - Supported operators: =, !=, >, >=, <, <=, IN, NOT IN, LIKE, ILIKE (Postgres), IS NULL, IS NOT NULL.
+  - Type resolution (reused from Feature 3): attributeTypeMap > Attributes registry > inference (numbers/booleans; cautious date/time) to drive SQL casts and hydration.
+
+- Projection and ordering
+  - Project requested attributes as aliased select fields using safe SQL fragments and add select type map entries so Cake hydrates to PHP-native types.
+  - Apply ORDER BY via typed expressions (casted extract for JSON Storage; joined value column for tables storage).
+
+- Safety and portability
+  - Always use ORM expression builders and named parameters; avoid raw concatenation and the Postgres “?” operator. Use jsonb_exists for key existence checks.
+  - Provide a per-query opt-out flag (e.g., options(['eavRewrite' => false])) for advanced callers.
+  - Ensure no N+1 joins: batch join strategy for multiple attributes; reuse join aliases when possible.
+
+- Backward compatibility
+  - [findByAttribute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#findByAttribute) remains supported and internally leverages the same type resolution and storage-mode routing.
+  - Existing explicit maps in behavior config (map) continue to work and can drive which attributes are projected by default.
+
+Tests
+- Tables storage (typed EAV):
+  - Query rewriting: equality, range comparisons, IN/NOT IN, LIKE; IS NULL/NOT NULL.
+  - Ordering by attribute fields (asc/desc).
+  - Typed hydration for integer, float/decimal (string for decimal), boolean, date, datetime, time, uuid.
+  - Multiple attribute conditions ensure single join per attribute/type (no duplicate joins).
+- JSON Storage Mode (Postgres):
+  - Same operator coverage using JSONB expressions (->>, casts).
+  - Ordering by attribute fields via casted expressions.
+  - Typed hydration via SelectTypeMap.
+  - Null/missing key semantics via jsonb_exists.
+- Magic finders:
+  - findBy<Color/YearStart/...> works equivalently in both modes.
+- Opt-out:
+  - When eavRewrite=false, conditions are not rewritten; user-provided raw conditions apply.
+
+Acceptance
+- For both storage modes, the following pass using only native Cake ORM syntax (no raw SQL in app code):
+  - Attribute-based filtering with supported operators produces correct SQL and results.
+  - Attribute-based ORDER BY works and respects type casting.
+  - Returned entities have PHP-native types for projected attributes (per TypeFactory expectations).
+- No duplicate joins for multiple conditions on the same attribute/type in tables storage.
+- JSON Storage Mode uses parameterized JSONB expressions (no “?” operator), and null semantics are correct via jsonb_exists.
+- A per-query opt-out exists and is honored.
+- Existing JSON Attribute and typed EAV paths remain functional and unchanged in behavior.
 
 Feature 8 — Tests
 - Rename fixtures from av_* to eav_*; switch ‘val’ to ‘value’; ensure unified entity_id across fixtures.

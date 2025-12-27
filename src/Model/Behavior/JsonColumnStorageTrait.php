@@ -16,7 +16,6 @@ use Cake\I18n\FrozenDate;
 use Cake\I18n\FrozenTime;
 use Cake\I18n\Time as I18nTime;
 use Cake\ORM\Query;
-use Cake\ORM\TableRegistry;
 
 /**
  * Internal helper for JSON Storage Mode (Postgres JSONB).
@@ -62,7 +61,7 @@ trait JsonColumnStorageTrait
     protected function getAliasedJsonColumn(Query $query): string
     {
         /** @var \Cake\ORM\Behavior $this */
-        $alias = $query->clause('from') ? $this->getTable()->getAlias() : $this->getTable()->getAlias();
+        $alias = $this->getTable()->getAlias();
         $column = $this->getJsonColumn();
 
         // Use dot-notation alias.column; quoting left to the driver.
@@ -279,8 +278,9 @@ trait JsonColumnStorageTrait
         $extract = "({$col} ->> {$quotedKey})";
         $lhs = $cast ? "({$extract})::{$cast}" : $extract;
 
+        // Default NULLS LAST for more intuitive ordering of sparse attributes.
         return [
-            'sql' => "{$lhs} {$dir}",
+            'sql' => "{$lhs} {$dir} NULLS LAST",
             'params' => [],
         ];
     }
