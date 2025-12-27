@@ -78,6 +78,39 @@ class EavSetupCommand extends Command
      */
     public function execute(Arguments $args, ConsoleIo $io): int
     {
+        // Interactive auto-launch behavior (Approach B)
+        $explicitInteractive = (bool)$args->getOption('interactive');
+        $explicitNoInteractive = (bool)$args->getOption('no-interactive');
+        $configPathOpt = (string)($args->getOption('config') ?? '');
+
+        if ($explicitInteractive && !$explicitNoInteractive) {
+            // Delegate to the wizard
+            $io->out('Launching interactive setup wizard ...');
+            $wizard = new EavSetupInteractiveCommand();
+            return $wizard->runInteractive($io);
+        }
+
+        // "Magic" launch when invoked with no options and no --no-interactive
+        if (!$explicitNoInteractive && !$explicitInteractive && $configPathOpt === '') {
+            $argv = $_SERVER['argv'] ?? [];
+            $passedOptions = 0;
+            foreach ($argv as $a) {
+                if (is_string($a) && str_starts_with($a, '--')) {
+                    // ignore explicit interactive toggles in the count
+                    if ($a === '--interactive' || $a === '--no-interactive') {
+                        continue;
+                    }
+                    $passedOptions++;
+                }
+            }
+            if ($passedOptions === 0) {
+                $io->out('Launching interactive setup wizard (use --no-interactive to run non-interactively).');
+                $wizard = new EavSetupInteractiveCommand();
+                return $wizard->runInteractive($io);
+            }
+        }
+
+        // Defaults from CLI
         $pkType = strtolower((string)$args->getOption('pk-type') ?: 'uuid');
         $uuidType = strtolower((string)$args->getOption('uuid-type') ?: 'uuid');
         $jsonStorage = strtolower((string)$args->getOption('json-storage') ?: 'json');
@@ -85,6 +118,33 @@ class EavSetupCommand extends Command
         $dryRun = (bool)$args->getOption('dry-run');
         $migrationName = (string)($args->getOption('name') ?: 'EavSetup');
 
+        // Optional: load config JSON (--config)
+        if ($configPathOpt !== '') {
+            $path = $configPathOpt;
+            if (!is_file($path)) {
+                $io->err('Config file not found: ' . $path);
+                return CommandInterface::CODE_ERROR;
+            }
+            $json = file_get_contents($path);
+            if ($json === false) {
+                $io->err('Unable to read config file: ' . $path);
+                return CommandInterface::CODE_ERROR;
+            }
+            $cfg = json_decode($json, true);
+            if (!is_array($cfg)) {
+                $io->err('Invalid JSON in config file: ' . $path);
+                return CommandInterface::CODE_ERROR;
+            }
+
+            // Use config as the source of truth for non-interactive run
+            $connectionName = (string)($cfg['connection'] ?? $connectionName);
+            $pkType = strtolower((string)($cfg['pkType'] ?? $pkType));
+            $uuidType = strtolower((string)($cfg['uuidType'] ?? $uuidType));
+            $jsonStorage = strtolower((string)($cfg['jsonAttributeStorage'] ?? $jsonStorage));
+            $migrationName = (string)($cfg['migrationName'] ?? $migrationName);
+        }
+
+        // Validate core choices
         if (!in_array($pkType, ['uuid', 'int'], true)) {
             $io->err('pk-type must be uuid or int.');
             return CommandInterface::CODE_ERROR;
@@ -98,6 +158,7 @@ class EavSetupCommand extends Command
             return CommandInterface::CODE_ERROR;
         }
 
+        // Resolve connection/driver and guard jsonb when not Postgres
         $connection = ConnectionManager::get($connectionName);
         $driver = $connection->getDriver();
         if ($jsonStorage === 'jsonb' && !$driver instanceof Postgres) {
@@ -105,10 +166,22 @@ class EavSetupCommand extends Command
             $jsonStorage = 'json';
         }
 
-        // Feature 2: resolve selected types (defaults, all, or CSV)
-        $typesArg = (string)($args->getOption('types') ?? 'defaults');
-        $types = $this->resolveSelectedTypes($typesArg);
+        // Resolve selected types (CLI or config)
+        $types = [];
+        if ($configPathOpt !== '') {
+            $json = file_get_contents($configPathOpt);
+            $cfg = $json !== false ? json_decode((string)$json, true) : null;
+            if (is_array($cfg) && isset($cfg['types']) && is_array($cfg['types'])) {
+                // Use types from config as-is (assumed normalized by the wizard)
+                $types = array_values(array_unique(array_map(fn($t) => strtolower((string)$t), $cfg['types'])));
+            }
+        }
+        if ($types === []) {
+            $typesArg = (string)($args->getOption('types') ?? 'defaults');
+            $types = $this->resolveSelectedTypes($typesArg);
+        }
 
+        // Build migration payload
         $payload = $this->buildMigration(
             $migrationName,
             $pkType,
@@ -116,6 +189,21 @@ class EavSetupCommand extends Command
             $jsonStorage,
             $types,
         );
+
+        // Stamp a header summarizing the selections
+        $header = "/**\n"
+            . " * EAV Setup Migration\n"
+            . " * connection: {$connectionName}\n"
+            . " * driver: " . get_class($driver) . "\n"
+            . " * pkType: {$pkType}\n"
+            . " * uuidType: {$uuidType}\n"
+            . " * jsonAttributeStorage: {$jsonStorage}\n"
+            . " * types: " . implode(',', $types) . "\n"
+            . " * generatedAt: " . gmdate('c') . "\n"
+            . " */\n\n";
+
+        // Insert header after declare(strict_types=1);
+        $payload = str_replace("declare(strict_types=1);\n\n", "declare(strict_types=1);\n\n" . $header, $payload);
 
         $path = $this->migrationPath();
         $fileName = $this->nextMigrationFilename($path, $migrationName);
@@ -138,7 +226,6 @@ class EavSetupCommand extends Command
         }
 
         $io->out('Migration written: ' . $fileName);
-        // Always include the connection flag for easy copy/paste and correctness in non-default connections.
         $io->out('Run: bin/cake migrations migrate -p Eav -c ' . $connectionName);
 
         return CommandInterface::CODE_SUCCESS;
@@ -150,7 +237,7 @@ class EavSetupCommand extends Command
      * @param string $typesArg defaults|all|csv
      * @return array<string>
      */
-    protected function resolveSelectedTypes(string $typesArg): array
+    public function resolveSelectedTypes(string $typesArg): array
     {
         // Defaults (pre-selected)
         $defaults = [
@@ -223,7 +310,7 @@ class EavSetupCommand extends Command
      * @param array<string> $types Types to create.
      * @return string
      */
-    protected function buildMigration(
+    public function buildMigration(
         string $name,
         string $pkType,
         string $uuidType,
@@ -356,7 +443,7 @@ PHP;
      *
      * @return string
      */
-    protected function migrationPath(): string
+    public function migrationPath(): string
     {
         return dirname(__DIR__, 2) . '/config/Migrations';
     }
@@ -368,7 +455,7 @@ PHP;
      * @param string $name Base name.
      * @return string
      */
-    protected function nextMigrationFilename(string $path, string $name): string
+    public function nextMigrationFilename(string $path, string $name): string
     {
         $timestamp = date('YmdHis');
         $base = $path . '/' . $timestamp . '_' . Inflector::underscore($name) . '.php';
@@ -391,6 +478,11 @@ PHP;
         $parser->addOption('dry-run', ['help' => 'Output migration without writing', 'boolean' => true]);
         // Feature 2: allow selecting types to scaffold
         $parser->addOption('types', ['help' => 'Types to scaffold: defaults|all|csv (e.g. "string,int,json,fk")', 'default' => 'defaults']);
+        // Feature 4: interactive and config options
+        $parser->addOption('interactive', ['help' => 'Launch interactive setup wizard', 'boolean' => true, 'default' => false]);
+        $parser->addOption('no-interactive', ['help' => 'Force non-interactive behavior (no wizard)', 'boolean' => true, 'default' => false]);
+        $parser->addOption('config', ['help' => 'Path to eav.json to load options from (non-interactive)', 'default' => null]);
+
         return $parser;
     }
 }

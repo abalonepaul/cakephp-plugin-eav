@@ -481,38 +481,115 @@ Feature 3 — JSON
   - Documentation refresh in README for JSON Storage Mode and indexing recommendations
 
 Feature 4 — Setup Command (Interactive)
-  Goals
-- Interactive prompts with safe driver-based defaults; minimal flags (flags remain for CI).
-- Prompt flow:
-  1) Connection (default datasource; prompt only if multiple).
-  2) Output: Cake Migrations (phinx) or raw SQL.
-  3) PK family: uuid or int.
-     - If uuid: UUID subtype (Recommended varies by driver)
-       - Postgres: nativeuuid (Recommended)
-       - MySQL/MariaDB: binaryuuid (Recommended)
-       - SQL Server: nativeuuid (Recommended)
-       - SQLite: uuid (string) (Recommended)
-  4) JSON column storage: json or jsonb (jsonb only on Postgres).
-  5) jsonEncodeOnWrite: yes/no (default yes).
-  6) Types to scaffold: defaults pre-selected; advanced types selectable.
-  7) Confirm and generate.
-- Schema specifics for all eav_* tables:
-  - id: UUID (row id)
-  - entity_table: string(191)
-  - entity_id: type depends on PK family (uuid subtype or biginteger)
-  - attribute_id: UUID
-  - value: column type per eav_<type> (json/jsonb for json)
-  - created, modified: DB default CURRENT_TIMESTAMP or addTimestamps (migrations)
-  - Unique index: (entity_table, entity_id, attribute_id)
-  - FK: attribute_id -> eav_attributes.id (ON DELETE CASCADE)
 
-Migrations and SQL
-- If Migrations: use addTimestamps for created/modified (safe even without Table classes).
-- If SQL: generate driver-specific SQL with appropriate column types and timestamp defaults.
-- Write chosen options as a header comment; persist the full selection in plugins/Eav/config/eav.json.
+Goals
+- Provide an interactive setup wizard with driver-aware defaults and minimal required flags (flags remain for CI).
+- Support both output modes:
+  - Migrations (default, cross-DB)
+  - Raw SQL (initially Postgres and MySQL; SQL Server/SQLite will fall back to Migrations with a notice)
+- Persist selections to plugins/Eav/config/eav.json for future reference and behavior defaults.
+- Optionally help configure JSON Storage Mode per entity table (Postgres/MySQL), without forcing it globally.
+
+Approach
+- Wrapper command (Approach B): add a new interactive command and keep the existing generator stable.
+  - New command: eav setup:interactive (wrapper/wizard)
+  - Existing command: [EavSetupCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php) remains non-interactive and focused on deterministic file generation.
+  - Magic entry: running “bin/cake eav setup” without key flags launches the wizard (unless --no-interactive is provided). With flags present, it behaves non-interactively as today.
+
+Prompt flow (wizard)
+1) Connection
+   - List configured connections (via ConnectionManager); show driver per connection; default to “default” if present.
+2) Output mode
+   - migrations (default)
+   - raw_sql (Postgres/MySQL supported now; others fall back to migrations with a notice)
+3) PK family
+   - uuid or int
+   - If uuid: choose subtype with driver-based recommendation:
+     - Postgres: nativeuuid (Recommended)
+     - MySQL/MariaDB: binaryuuid (Recommended)
+     - SQL Server: nativeuuid (Recommended)
+     - SQLite: uuid (string) (Recommended)
+4) JSON Attribute column type (for eav_json.value)
+   - json or jsonb (jsonb only if driver is Postgres; otherwise auto-fallback to json with a notice)
+5) Behavior storage default
+   - tables (typed AV tables; default)
+   - json_column (JSON Storage Mode per table; Postgres/MySQL only in this feature)
+6) JSON Storage Mode (per-table, optional)
+   - If json_column chosen above:
+     - Enumerate app tables (like Bake) and allow selecting one or more entity tables.
+     - For each selected table:
+       - Pick an existing JSON/JSONB column, or
+       - Generate a migration to add one:
+         - Postgres: jsonb NULL (no default '{}'); optional indexes:
+           - GIN on the JSONB column
+           - Functional indexes (typed extracts) for “hot” keys (optional; list keys as CSV)
+         - MySQL: json NULL; index generation deferred (document limitations)
+     - Persist mapping in eav.json: {"items":"attrs", "products":"spec"}.
+7) jsonEncodeOnWrite default
+   - yes/no (default: no) — applies only to JSON Attribute (eav_json) in tables storage; ignored in JSON Storage Mode.
+8) Types to scaffold
+   - defaults, all, or CSV of extras (aliases normalized; validated against TypeFactory/custom ‘fk’).
+9) Migration name
+   - Default: EavSetup; allow custom suffix for clarity.
+10) Confirm and generate
+   - Print a summary of all answers; proceed on confirmation.
+
+Outputs
+- Always persist to plugins/Eav/config/eav.json with:
+  - connection, driver, outputMode, pkType, uuidType
+  - jsonAttributeStorage (json|jsonb)
+  - jsonEncodeOnWrite default
+  - storageDefault (tables|json_column)
+  - jsonColumns mapping (per-table json column names, if provided)
+  - types list
+  - migrationName
+  - generatedAt (ISO 8601)
+- If output is Migrations:
+  - Delegate to [EavSetupCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php) to build migration payload.
+  - Add a header docblock summarizing all selections to the migration file.
+  - Print the exact migrate command with the chosen connection: “bin/cake migrations migrate -p Eav -c <connection>”.
+- If output is Raw SQL:
+  - Postgres/MySQL: generate DDL with the same canonical schema:
+    - attributes, attribute_sets, attribute_set_attributes
+    - eav_* tables with id, entity_table, entity_id, attribute_id, value (nullable), timestamps
+    - Unique index: (entity_table, entity_id, attribute_id) and FK on attribute_id
+    - eav_json.value type per selection (json|jsonb)
+  - Write SQL to a file (e.g., plugins/Eav/config/Sql/<timestamp>_<name>.sql) or stream to console if write fails.
+  - SQL Server/SQLite: show “coming soon” and fall back to Migrations.
+
+Schema specifics for all eav_* tables (unchanged)
+- id: UUID (row id via chosen uuidType)
+- entity_table: string(191)
+- entity_id: uuidType or biginteger based on PK family
+- attribute_id: UUID
+- value: per eav_<type> (json/jsonb for eav_json), NULL allowed
+- created, modified: via addTimestamps (migrations) or DB defaults (SQL)
+- Unique index: (entity_table, entity_id, attribute_id)
+- FK: attribute_id -> attributes.id (ON DELETE CASCADE)
+
+Non-interactive and CI behavior
+- Keep current flags for [EavSetupCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php) intact (pk-type, uuid-type, json-storage, types, name, connection, dry-run).
+- eav setup with any key flags remains non-interactive; with no flags, show a one-line hint and launch the wizard unless --no-interactive is set.
 
 Acceptance
-- Running “bin/cake eav setup” interactively generates a migration or SQL with canonical naming, unified entity_id, and value column.
+- Running “bin/cake eav setup” with no key flags launches the interactive wizard; with flags or --no-interactive, it remains non-interactive.
+- eav.json is written at plugins/Eav/config/eav.json with all selected options, including per-table jsonColumns mapping when provided.
+- Migrations output path uses canonical eav_* naming, unified entity_id, nullable value, addTimestamps, and prints the exact migrate command with the chosen connection.
+- Raw SQL output:
+  - Postgres/MySQL: SQL file generated successfully; SQL Server/SQLite fall back to Migrations with a notice.
+- JSON Storage Mode prompts:
+  - App tables listed; user can pick per-table JSON column (existing or create via migration).
+  - For Postgres, optional GIN and functional indexes can be included.
+- Backward compatibility: existing non-interactive usage (flags) continues to work unchanged.
+
+Tests (to add with implementation)
+- ConsoleIntegrationTestTrait coverage for:
+  - Non-interactive path (flags) remains identical to current behavior.
+  - Interactive flow happy path simulated via mocked IO (prompt/answer sequences).
+  - eav.json content structure/assertions (decode and validate keys).
+  - Postgres raw SQL generation sanity (header, tables, indexes present).
+  - MySQL raw SQL generation sanity (header, tables present).
+  - SQL Server/SQLite paths show fallback notice and write a migration.
 
 Feature 5 — EavEntities / EavAttributes / EavAttributeSets
 Goals
