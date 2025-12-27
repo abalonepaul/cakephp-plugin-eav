@@ -605,6 +605,74 @@ Acceptance
 - A per-query opt-out exists and is honored.
 - Existing JSON Attribute and typed EAV paths remain functional and unchanged in behavior.
 
+  - Summary of Feature 7 (Query Rewriting + Projections for EAV)
+ - What was delivered
+   - Unified query rewriting in the behavior:
+   - JSON Storage Mode (entity-level JSON/JSONB column)
+    - Automatic projections so attributes behave like native fields in SELECT/ORDER.
+    - Implemented in beforeFind using buildSelectProjection and applyProjection.
+     - Attribute-based WHERE rewriting for:
+     - Flat array conditions in options: buildWhereFragment + applyWhere
+     - expression-tree conditions added via ->where([...]) and grouped logic: rewriteJsonWhereTree
+     - Typed ORDER BY with default NULLS LAST: buildOrderFragment + applyOrder
+     - Correct WHERE null semantics for absent keys via jsonb_exists
+   - Tables Storage Mode (eav_* AV tables)
+     - One join per attribute/type with deduplication; WHERE rewrite supports =, !=, >, >=, <, <=, IN/NOT IN, LIKE/ILIKE, IS NULL/IS NOT NULL:
+     - Array conditions path in beforeFind
+     - Expression-tree rewrite in rewriteTablesWhereTree
+     - Projections to expose attribute values as select aliases for ORDER/hydration
+     - ORDER BY on attributes with NULLS LAST (native on Postgres, emulation on others) within beforeFind
+   - Per-query controls and safety:
+     - eavRewrite option (default true) to disable rewriting per query at beforeFind
+     - eavTypes option to hint types per query (drives JSON casts and AV table selection)
+     - Collision guard so native columns are never treated as attributes (base schema introspected in beforeFind)
+   - JSON writes and typed hydration retained:
+   - JSON writes via jsonb_set in afterSave using buildJsonbSetUpdateSql
+   - Typed post-hydration for JSON projections in afterFind
+   - Setup generator and migrations:
+   - Generated AV tables now have nullable value columns (aligns with “explicit NULL” rows + missing-row semantics) in the generated migrations (see config/Migrations), produced by EavSetupCommand#buildMigration
+   - Setup command now always prints the connection-specific migrate command in execute
+   - Migration/utility command hardening:
+   - EavMigrateJsonbToEavCommand#execute uses jsonb_exists and supports --connection with dry-run/batching
+
+ - Tests that validate the feature
+   - JSON Storage Mode tests: EavJsonStorageModeTest
+     - String/numeric/boolean/date queries with typed projections and ordering
+     - Where rewriting with plain attribute names (no raw JSONB), including IN and IS NULL semantics
+     - Explicit select(['id','color']) projection and ORDER by attribute alias
+   - Tables Storage Mode tests: EavTablesStorageModeTest
+     - Equality where rewrite (color = 'red'), IS NULL semantics (missing row treated as NULL), ORDER BY with NULLS LAST
+     - Test fixture TestEntitiesFixture and AV fixtures validate join + projection behavior
+   - Behavior infrastructure tests: EavBehaviorTest
+     - Type normalization, casting, batched fetch, and creating attributes on save
+   - Command tests:
+     - EavSetupCommandTest dry-run output
+     - EavCreateAttributeCommandTest create/no-op duplicate flow
+
+ - Acceptance criteria vs goals
+   - AC: “EAV attributes act like native fields in queries” (where/order/select) across both storage modes
+   - Met. JSON: alias projections + typed WHERE/ORDER rewrite. Tables: joins + projections + ORDER rewrite.
+   - AC: “Per-query opt-out and typing overrides”
+   - Met via options(['-eavRewrite' => false]) and options(['eavTypes' => ['attr' => 'type']]) in beforeFind
+   - AC: “Null semantics consistent”
+   - Met. JSON uses jsonb_exists for missing-key-as-NULL; Tables uses LEFT JOIN + value IS NULL; AV “value” columns are nullable.
+   - AC: “Ordering NULLS LAST by default”
+   - Met. JSON adds NULLS LAST in buildOrderFragment; Tables enforces at beforeFind (native on Postgres; emulated elsewhere).
+   - AC: “No native column collisions”
+   - Met. Collision guard prevents attribute rewriting for base table columns.
+   - AC: “Generator and commands support production workflows”
+   - Met. Setup command generates nullable AV value columns and prints connection-aware migrate command; migration utility hardened for Postgres JSONB.
+
+ - Notable implementation details
+   - Type resolution precedence: behavior map/attributeTypeMap > eavTypes (per-query) > Attributes registry > inference > default 'string'
+   - Safe parameter binding everywhere (no string concatenation of values)
+   - Deduplicated joins per attribute/type alias in tables storage
+   - Centralized select type normalization via normalizeSelectType
+
+ - Outcome
+   - All plugin tests pass locally against Postgres with PHP 8.1, validating JSON and tables storage modes, command behavior, and setup generation.
+   - Feature 7’s goals are achieved; the behavior now makes EAV attributes first-class citizens in ORM query building with sensible defaults and escape hatches.
+
 Feature 8 — Tests
 - Rename fixtures from av_* to eav_*; switch ‘val’ to ‘value’; ensure unified entity_id across fixtures.
 - Update tests that assumed AvJsonbUuid class naming (canonicalize to EavJson).
