@@ -27,10 +27,14 @@ use Cake\Validation\Validator;
  */
 class AttributesTable extends Table
 {
+    /**
+     * @deprecated Use EavAttributesTable instead. This class now points to 'eav_attributes' to ease transition.
+     */
     public function initialize(array $config): void
     {
         parent::initialize($config);
-        $this->setTable('attributes');
+        // BC: point legacy alias to the new prefixed table
+        $this->setTable('eav_attributes');
         $this->setPrimaryKey('id');
         $this->addBehavior('Timestamp');
     }

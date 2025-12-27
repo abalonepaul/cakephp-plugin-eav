@@ -28,7 +28,6 @@ use Cake\Database\Expression\IdentifierExpression;
 use Cake\Database\Expression\ComparisonExpression;
 use Cake\Database\Expression\UnaryExpression;
 use Cake\Database\Expression\OrderByExpression;
-use Cake\Database\Expression\QueryExpression as DbQueryExpression;
 
 
 class EavBehavior extends Behavior
@@ -43,7 +42,7 @@ class EavBehavior extends Behavior
         'map'               => [],     // 'field' => ['attribute'=>'name','type'=>'decimal']
         'events'            => ['beforeMarshal'=>true,'afterSave'=>true,'afterFind'=>true],
         'jsonStorage'       => 'json', // json|jsonb (for JSON Attribute table eav_json)
-        'jsonEncodeOnWrite' => true,   // gate JSON encoding behavior on writes (ignored in JSON Storage Mode)
+        'jsonEncodeOnWrite' => false,  // default false per PLAN; ignored in JSON Storage Mode
         // JSON Storage Mode (entity-level JSONB bundle):
         'storage'           => 'tables', // 'tables' (default) | 'json_column'
         'jsonColumn'        => null,     // e.g., 'attrs' or 'spec' when storage=json_column
@@ -375,7 +374,7 @@ class EavBehavior extends Behavior
             $existingWhere = $query->clause('where');
             if ($existingWhere instanceof ExpressionInterface) {
                 $rewritten = $this->rewriteJsonWhereTree($query, $existingWhere, $nativeColumns, $overrideTypes, $configuredTypes);
-                if ($rewritten instanceof DbQueryExpression) {
+                if ($rewritten instanceof QueryExpression) {
                     $query->where($rewritten, [], true);
                 }
             }
@@ -487,7 +486,7 @@ class EavBehavior extends Behavior
                 // Resolve attribute id; skip if unknown
                 $attrId = null;
                 try {
-                    $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                    $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                     $attrRow = $Attributes->find()
                         ->select(['id'])
                         ->where(['name' => $field])
@@ -578,7 +577,7 @@ class EavBehavior extends Behavior
                 $resolvedType = strtolower((string)$map[$field]['type']);
             } else {
                 try {
-                    $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                    $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                     $row = $Attributes->find()->select(['data_type'])->where(['name' => $field])->enableHydration(false)->first();
                     if ($row && isset($row['data_type'])) {
                         $resolvedType = strtolower((string)$row['data_type']);
@@ -594,7 +593,7 @@ class EavBehavior extends Behavior
             // Resolve attribute id; skip if unknown
             $attrId = null;
             try {
-                $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                 $attrRow = $Attributes->find()
                     ->select(['id'])
                     ->where(['name' => $field])
@@ -702,7 +701,7 @@ class EavBehavior extends Behavior
                     $resolvedType = strtolower((string)$map[$field]['type']);
                 } else {
                     try {
-                        $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                        $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                         $row = $Attributes->find()->select(['data_type'])->where(['name' => $field])->enableHydration(false)->first();
                         if ($row && isset($row['data_type'])) {
                             $resolvedType = strtolower((string)$row['data_type']);
@@ -718,7 +717,7 @@ class EavBehavior extends Behavior
                 // Resolve attribute id; skip if unknown
                 $attrId = null;
                 try {
-                    $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                    $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                     $attrRow = $Attributes->find()
                         ->select(['id'])
                         ->where(['name' => $field])
@@ -872,7 +871,7 @@ class EavBehavior extends Behavior
                             $resolvedType = strtolower((string)$map[$name]['type']);
                         } else {
                             try {
-                                $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                                $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                                 $row = $Attributes->find()->select(['data_type'])->where(['name' => $name])->enableHydration(false)->first();
                                 if ($row && isset($row['data_type'])) {
                                     $resolvedType = strtolower((string)$row['data_type']);
@@ -888,7 +887,7 @@ class EavBehavior extends Behavior
                         // Resolve attribute id; skip if unknown
                         $attrId = null;
                         try {
-                            $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                            $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                             $attrRow = $Attributes->find()
                                 ->select(['id'])
                                 ->where(['name' => $name])
@@ -975,7 +974,7 @@ class EavBehavior extends Behavior
                         $resolvedType = strtolower((string)$map[$fname]['type']);
                     } else {
                         try {
-                            $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                            $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                             $row = $Attributes->find()->select(['data_type'])->where(['name' => $fname])->enableHydration(false)->first();
                             if ($row && isset($row['data_type'])) {
                                 $resolvedType = strtolower((string)$row['data_type']);
@@ -990,7 +989,7 @@ class EavBehavior extends Behavior
 
                     $attrId = null;
                     try {
-                        $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                        $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                         $attrRow = $Attributes->find()->select(['id'])->where(['name' => $fname])->enableHydration(false)->first();
                         if ($attrRow && isset($attrRow['id'])) {
                             $attrId = (string)$attrRow['id'];
@@ -1132,7 +1131,7 @@ class EavBehavior extends Behavior
                 } else {
                     // Try registry
                     try {
-                        $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                        $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                         $row = $Attributes->find()->select(['data_type'])->where(['name' => $field])->enableHydration(false)->first();
                         if ($row && isset($row['data_type'])) {
                             $resolvedType = strtolower((string)$row['data_type']);
@@ -1157,7 +1156,7 @@ class EavBehavior extends Behavior
                 // Fetch attribute id if it exists; do not create implicitly
                 $attrId = null;
                 try {
-                    $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                    $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                     $attrRow = $Attributes->find()->select(['id'])->where(['name' => $field])->enableHydration(false)->first();
                     if ($attrRow && isset($attrRow['id'])) {
                         $attrId = (string)$attrRow['id'];
@@ -1299,7 +1298,7 @@ class EavBehavior extends Behavior
                 $entityField,
                 $entityTableName
             );
-            if ($rewritten instanceof DbQueryExpression) {
+            if ($rewritten instanceof QueryExpression) {
                 // Overwrite original WHERE with the rewritten tree
                 $query->where($rewritten, [], true);
             }
@@ -1337,7 +1336,7 @@ class EavBehavior extends Behavior
         string $rootPk,
         string $entityField,
         string $entityTableName
-    ): ?DbQueryExpression {
+    ): ?QueryExpression {
         $driver = $query->getConnection()->getDriver();
 
         // Helper: resolve attribute type from overrides/map/registry/inference
@@ -1349,7 +1348,7 @@ class EavBehavior extends Behavior
                 return strtolower((string)$map[$field]['type']);
             }
             try {
-                $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                 $row = $Attributes->find()
                     ->select(['data_type'])
                     ->where(['name' => $field])
@@ -1383,7 +1382,7 @@ class EavBehavior extends Behavior
             // Resolve attribute id; skip if unknown
             $attrId = null;
             try {
-                $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+                $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
                 $attrRow = $Attributes->find()
                     ->select(['id'])
                     ->where(['name' => $field])
@@ -1435,7 +1434,7 @@ class EavBehavior extends Behavior
 
         // Root-leaf rewrite for direct expressions (Unary IS NULL/IS NOT NULL, or Comparison incl. IN/NOT IN)
         if ($expr instanceof UnaryExpression || $expr instanceof ComparisonExpression) {
-            $group = new DbQueryExpression([], [], 'AND');
+            $group = new QueryExpression([], [], 'AND');
 
             if ($expr instanceof UnaryExpression) {
                 $rawField = null;
@@ -1510,14 +1509,14 @@ class EavBehavior extends Behavior
             // CakePHP 5: IN/NOT IN are handled via ComparisonExpression operators; no InExpression branch required.
         }
 
-        if ($expr instanceof DbQueryExpression) {
+        if ($expr instanceof QueryExpression) {
             // Cake 5 signature: new QueryExpression(conditions, types, conjunction)
-            $group = new DbQueryExpression([], [], $expr->getConjunction() ?? 'AND');
+            $group = new QueryExpression([], [], $expr->getConjunction() ?? 'AND');
 
             $__parts = [];
             $expr->iterateParts(function ($p) use (&$__parts) { $__parts[] = $p; });
             foreach ($__parts as $part) {
-                if ($part instanceof DbQueryExpression) {
+                if ($part instanceof QueryExpression) {
                     $sub = $this->rewriteTablesWhereTree(
                         $query,
                         $part,
@@ -1669,7 +1668,7 @@ class EavBehavior extends Behavior
         }
 
         // Fallback: wrap leaf as a group (Cake 5 signature)
-        $fallback = new DbQueryExpression([], [], 'AND');
+        $fallback = new QueryExpression([], [], 'AND');
         $fallback->add($expr);
         return $fallback;
     }
@@ -1829,7 +1828,8 @@ class EavBehavior extends Behavior
         if (isset($this->attributeIdCache[$name])) {
             return $this->attributeIdCache[$name];
         }
-        $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+        // Use canonical prefixed alias per Feature 5: Eav.EavAttributes
+        $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
         $attr = $Attributes->find()->select(['id', 'name'])->where(['name' => $name])->first();
         if (!$attr) {
             $entity = $Attributes->newEntity([
@@ -1971,7 +1971,7 @@ class EavBehavior extends Behavior
         }
         $nameMap = $this->attributeNameCache;
         if ($attributeIds) {
-            $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+            $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
             $attrs = $Attributes->find()
                 ->select(['id', 'name'])
                 ->where(['id IN' => array_keys($attributeIds)])
@@ -2266,7 +2266,7 @@ class EavBehavior extends Behavior
         array $nativeColumns,
         array $overrideTypes,
         array $configuredTypes
-    ): ?DbQueryExpression {
+    ): ?QueryExpression {
         // Helper: normalize field reference to plain string (IdentifierExpression|string)
         $fieldNameOf = function (mixed $field): ?string {
             if (is_string($field)) {
@@ -2281,7 +2281,7 @@ class EavBehavior extends Behavior
 
         // Root-leaf: handle UnaryExpression (IS [NOT] NULL) and ComparisonExpression (incl. IN/NOT IN)
         if ($expr instanceof UnaryExpression || $expr instanceof ComparisonExpression) {
-            $group = new DbQueryExpression([], [], 'AND');
+            $group = new QueryExpression([], [], 'AND');
 
             if ($expr instanceof UnaryExpression) {
                 $ident = null;
@@ -2328,13 +2328,13 @@ class EavBehavior extends Behavior
         }
 
         // Recurse into groups and rebuild preserving conjunctions
-        if ($expr instanceof DbQueryExpression) {
+        if ($expr instanceof QueryExpression) {
             // Use the correct constructor signature: conditions, types, conjunction
-            $group = new DbQueryExpression([], [], $expr->getConjunction() ?? 'AND');
+            $group = new QueryExpression([], [], $expr->getConjunction() ?? 'AND');
             $__parts = [];
             $expr->iterateParts(function ($p) use (&$__parts) { $__parts[] = $p; });
             foreach ($__parts as $part) {
-                if ($part instanceof DbQueryExpression) {
+                if ($part instanceof QueryExpression) {
                     $sub = $this->rewriteJsonWhereTree($query, $part, $nativeColumns, $overrideTypes, $configuredTypes);
                     $group->add($sub ?? $part);
                     continue;
@@ -2347,7 +2347,7 @@ class EavBehavior extends Behavior
                             $ident = $e->getIdentifier();
                         }
                     });
-                    // Default to IS NULL for unary field checks
+                    // Default to IS NULL for   unary field checks
                     $sqlOp = 'IS NULL';
 
                     if (is_string($ident) && $ident !== '' && !str_contains($ident, '.') && !isset($nativeColumns[$ident])) {
@@ -2391,7 +2391,7 @@ class EavBehavior extends Behavior
         }
 
         // Fallback: wrap leaf expression in a group
-        $fallback = new DbQueryExpression([], [], 'AND');
+        $fallback = new QueryExpression([], [], 'AND');
         $fallback->add($expr);
         return $fallback;
     }

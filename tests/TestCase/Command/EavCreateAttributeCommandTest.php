@@ -26,8 +26,8 @@ class EavCreateAttributeCommandTest extends TestCase
 
         $connection = ConnectionManager::get('test');
         $existing = $connection->getSchemaCollection()->listTables();
-        if (!in_array('attributes', $existing, true)) {
-            $schema = new TableSchema('attributes');
+        if (!in_array('eav_attributes', $existing, true)) {
+            $schema = new TableSchema('eav_attributes');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])

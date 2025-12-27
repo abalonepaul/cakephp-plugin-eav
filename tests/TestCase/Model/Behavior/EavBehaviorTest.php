@@ -52,8 +52,8 @@ class EavBehaviorTest extends TestCase
         $existing = $connection->getSchemaCollection()->listTables();
         $definitions = [];
 
-        if (!in_array('attributes', $existing, true)) {
-            $schema = new TableSchema('attributes');
+        if (!in_array('eav_attributes', $existing, true)) {
+            $schema = new TableSchema('eav_attributes');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
@@ -162,7 +162,7 @@ class EavBehaviorTest extends TestCase
         $this->assertInstanceOf(Time::class, $time);
 
         $json = $this->behavior->exposeCastValue('json', ['a' => 1]);
-        $this->assertSame('{"a":1}', $json);
+        $this->assertSame(['a' => 1], $json);
     }
 
     public function testFetchEavValuesBatchLoadsAttributes(): void

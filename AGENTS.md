@@ -8,7 +8,7 @@ This objective of this project is to upgrade the original plugin to CakePHP 5.x.
 Use PHP 8.1. The working directory for the application is `/home/paul/dev/cakephp/protech_parts`. The working directory for the plugin is `/home/paul/dev/cakephp/protech_parts/plugins/Eav`.
 
 The DSN for the database is postgres://postgres:postgres@host:5432/protech_parts
-The SQL Files used to create the EAV tables are in config/Migrations
+The SQL Files are created using the Migrations Plugin or raw SQL snapshot via commands.
 
 When the schema changes are needed, they should be done using CakePHP Migrations Plugin.
 

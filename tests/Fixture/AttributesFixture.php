@@ -7,7 +7,7 @@ use Cake\TestSuite\Fixture\TestFixture;
 
 class AttributesFixture extends TestFixture
 {
-    public string $table = 'attributes';
+    public string $table = 'eav_attributes';
 
     public array $fields = [
         'id' => ['type' => 'uuid', 'null' => false],

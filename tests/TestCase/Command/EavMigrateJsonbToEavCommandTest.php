@@ -30,6 +30,16 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
         $existing = $connection->getSchemaCollection()->listTables();
         $definitions = [];
 
+        if (!in_array('json_entities', $existing, true)) {
+            $jsonEntities = new TableSchema('json_entities');
+            $jsonEntities
+                ->addColumn('id', ['type' => 'uuid', 'null' => false])
+                // jsonb so jsonb_exists(...) works without extra casts in tests
+                ->addColumn('data', ['type' => 'json', 'null' => true])
+                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
+            $definitions[] = $jsonEntities;
+        }
+
         if (!in_array('attributes', $existing, true)) {
             $schema = new TableSchema('attributes');
             $schema

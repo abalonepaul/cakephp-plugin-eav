@@ -8,6 +8,8 @@ use Cake\Database\Expression\QueryExpression;
 use Cake\ORM\Table;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
+use Cake\Datasource\ConnectionManager;
+use Cake\Database\Schema\TableSchema;
 
 /**
  * JSON Storage Mode behavior tests (entity-level JSONB column).
@@ -23,6 +25,46 @@ class EavJsonStorageModeTest extends TestCase
     ];
     private Table $Items;
     private Table $Products;
+
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+
+        $connection = ConnectionManager::get('test');
+        $existing = $connection->getSchemaCollection()->listTables();
+
+        $schemas = [];
+
+        if (!in_array('items', $existing, true)) {
+            $items = new TableSchema('items');
+            $items
+                ->addColumn('id', ['type' => 'uuid', 'null' => false])
+                // json column for JSON Storage Mode tests (we cast to ::jsonb in queries)
+                ->addColumn('attrs', ['type' => 'json', 'null' => true])
+                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
+            $schemas[] = $items;
+        }
+
+        if (!in_array('products', $existing, true)) {
+            $products = new TableSchema('products');
+            $products
+                ->addColumn('id', ['type' => 'uuid', 'null' => false])
+                // json column for JSON Storage Mode tests (we cast to ::jsonb in queries)
+                ->addColumn('spec', ['type' => 'json', 'null' => true])
+                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
+            $schemas[] = $products;
+        }
+
+        if ($schemas !== []) {
+            $connection->disableConstraints(function ($connection) use ($schemas): void {
+                foreach ($schemas as $schema) {
+                    foreach ($schema->createSql($connection) as $sql) {
+                        $connection->execute($sql);
+                    }
+                }
+            });
+        }
+    }
 
     protected function setUp(): void
     {

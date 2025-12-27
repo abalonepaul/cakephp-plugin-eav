@@ -55,7 +55,7 @@ class EavCreateAttributeCommand extends Command
             $label = Inflector::humanize($name);
         }
 
-        $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+        $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
         $existing = $Attributes->find()->select(['id'])->where(['name' => $name])->first();
         if ($existing) {
             $io->out('Attribute already exists: ' . $name);

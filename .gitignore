@@ -5,4 +5,8 @@
 AGENTS-VSCode.md
 /config/Migrations/schema-dump-default.lock
 /config/Migrations/schema-dump-test.lock
-/config/Migrations/*_eav_setup.php
+*._eav_setup.php
+/config/Migrations/20251227082334_eav_setup_j_s_o_n_b.php
+/config/Migrations/20251227082532_eav_setup_tables.php
+/config/Migrations/20251227083656_add_json_columns.php
+/config/eav.json

@@ -83,7 +83,7 @@ class EavMigrateJsonbToEavCommand extends Command
             return Command::CODE_ERROR;
         }
 
-        $Attributes = $this->getTableLocator()->get('Eav.Attributes', ['connectionName' => $connectionName]);
+        $Attributes = $this->getTableLocator()->get('Eav.EavAttributes', ['connectionName' => $connectionName]);
         $attr = $Attributes->find()->where(['name' => $attribute])->first();
         if (!$attr) {
             $attr = $Attributes->newEntity([
