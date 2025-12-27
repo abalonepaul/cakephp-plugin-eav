@@ -5,12 +5,13 @@ namespace Eav\Command;
 
 use Cake\Command\Command;
 use Cake\Console\Arguments;
+use Cake\Console\CommandInterface;
 use Cake\Console\ConsoleIo;
 use Cake\Database\Driver\Postgres;
 use Cake\Database\TypeFactory;
 use Cake\Datasource\ConnectionManager;
 use Cake\Utility\Inflector;
-use InvalidArgumentException;
+use Cake\Console\ConsoleOptionParser;
 
 class EavSetupCommand extends Command
 {
@@ -71,8 +72,8 @@ class EavSetupCommand extends Command
     /**
      * Generate a migration for EAV schema based on configuration.
      *
-     * @param \Cake\Console\Arguments $args Arguments.
-     * @param \Cake\Console\ConsoleIo $io Console io.
+     * @param Arguments $args Arguments.
+     * @param ConsoleIo $io Console io.
      * @return int
      */
     public function execute(Arguments $args, ConsoleIo $io): int
@@ -86,15 +87,15 @@ class EavSetupCommand extends Command
 
         if (!in_array($pkType, ['uuid', 'int'], true)) {
             $io->err('pk-type must be uuid or int.');
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
         if (!in_array($uuidType, ['uuid', 'binaryuuid', 'nativeuuid'], true)) {
             $io->err('uuid-type must be uuid, binaryuuid, or nativeuuid.');
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
         if (!in_array($jsonStorage, ['json', 'jsonb'], true)) {
             $io->err('json-storage must be json or jsonb.');
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
 
         $connection = ConnectionManager::get($connectionName);
@@ -123,23 +124,24 @@ class EavSetupCommand extends Command
             $io->out('Dry run - migration not written.');
             $io->out('Target: ' . $fileName);
             $io->out($payload);
-            return Command::CODE_SUCCESS;
+            return CommandInterface::CODE_SUCCESS;
         }
 
         if (!is_dir($path) && !mkdir($path, 0775, true) && !is_dir($path)) {
             $io->err('Unable to create migrations directory: ' . $path);
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
 
         if (file_put_contents($fileName, $payload) === false) {
             $io->err('Unable to write migration file: ' . $fileName);
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
 
         $io->out('Migration written: ' . $fileName);
-        $io->out('Run: bin/cake migrations migrate -p Eav');
+        // Always include the connection flag for easy copy/paste and correctness in non-default connections.
+        $io->out('Run: bin/cake migrations migrate -p Eav -c ' . $connectionName);
 
-        return Command::CODE_SUCCESS;
+        return CommandInterface::CODE_SUCCESS;
     }
 
     /**
@@ -338,7 +340,7 @@ class {$className} extends AbstractMigration
                 ->addColumn('entity_table', 'string', ['limit' => 191, 'null' => false])
                 ->addColumn('{$entityField}', '{$entityFieldType}', ['null' => false])
                 ->addColumn('attribute_id', '{$uuidType}', ['null' => false])
-                ->addColumn('value', \$spec['valType'], \$spec['valOptions'])
+                ->addColumn('value', \$spec['valType'], array_merge(\$spec['valOptions'], ['null' => true]))
                 ->addTimestamps('created', 'modified')
                 ->addIndex(['entity_table', '{$entityField}', 'attribute_id'], ['unique' => true, 'name' => 'idx_' . \$spec['table'] . '_lookup'])
                 ->addForeignKey('attribute_id', 'attributes', 'id', ['delete' => 'CASCADE'])
@@ -379,7 +381,7 @@ PHP;
         return $base;
     }
 
-    public function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
+    public function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser
     {
         $parser->addOption('pk-type', ['help' => 'Primary key type: uuid|int', 'default' => 'uuid']);
         $parser->addOption('uuid-type', ['help' => 'UUID storage type: uuid|binaryuuid|nativeuuid', 'default' => 'uuid']);

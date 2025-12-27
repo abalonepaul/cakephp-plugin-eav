@@ -9,6 +9,9 @@ use Cake\ORM\TableRegistry;
 use Cake\Console\TestSuite\ConsoleIntegrationTestTrait;
 use Cake\TestSuite\TestCase;
 
+/**
+ * @uses \Eav\Command\EavCreateAttributeCommand
+ */
 class EavCreateAttributeCommandTest extends TestCase
 {
     use ConsoleIntegrationTestTrait;

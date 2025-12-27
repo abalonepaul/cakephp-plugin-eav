@@ -9,6 +9,9 @@ use Cake\Datasource\ConnectionManager;
 use Cake\ORM\TableRegistry;
 use Cake\TestSuite\TestCase;
 
+/**
+ * @uses \Eav\Command\EavMigrateJsonbToEavCommand
+ */
 class EavMigrateJsonbToEavCommandTest extends TestCase
 {
     use ConsoleIntegrationTestTrait;
@@ -48,21 +51,14 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
                 ->addColumn('entity_table', ['type' => 'string', 'length' => 191, 'null' => false])
                 ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('value', ['type' => 'string', 'length' => 1024, 'null' => false])
+                ->addColumn('value', ['type' => 'string', 'length' => 1024, 'null' => true])
                 ->addColumn('created', ['type' => 'datetime', 'null' => false])
                 ->addColumn('modified', ['type' => 'datetime', 'null' => false])
                 ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
             $definitions[] = $schema;
         }
 
-        if (!in_array('test_json_entities', $existing, true)) {
-            $connection->execute(
-                'CREATE TABLE test_json_entities (
-                    id UUID PRIMARY KEY,
-                    data JSONB NOT NULL
-                )'
-            );
-        }
+        // json_entities table is provided by the JsonEntitiesFixture; no need to create it here.
 
         if ($definitions !== []) {
             $connection->disableConstraints(function ($connection) use ($definitions): void {

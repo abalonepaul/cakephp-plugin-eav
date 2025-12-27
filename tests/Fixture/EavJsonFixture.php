@@ -14,7 +14,7 @@ class EavJsonFixture extends TestFixture
         'entity_table' => ['type' => 'string', 'length' => 191, 'null' => false],
         'entity_id' => ['type' => 'uuid', 'null' => false],
         'attribute_id' => ['type' => 'uuid', 'null' => false],
-        'value' => ['type' => 'json', 'null' => false],
+        'value' => ['type' => 'json', 'null' => true],
         'created' => ['type' => 'datetime', 'null' => false],
         'modified' => ['type' => 'datetime', 'null' => false],
         '_constraints' => [

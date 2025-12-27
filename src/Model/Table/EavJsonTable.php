@@ -5,6 +5,11 @@ namespace Eav\Model\Table;
 
 use Cake\ORM\Table;
 
+/**
+ * @mixin \Cake\ORM\Behavior\TimestampBehavior
+ *
+ * @extends \Cake\ORM\Table<array{Timestamp: \Cake\ORM\Behavior\TimestampBehavior}>
+ */
 class EavJsonTable extends Table
 {
     public function initialize(array $config): void
