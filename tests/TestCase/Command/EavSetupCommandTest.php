@@ -25,6 +25,7 @@ class EavSetupCommandTest extends TestCase
         $this->assertOutputContains('class EavSetup extends AbstractMigration');
         $this->assertOutputContains("->table('eav_attributes'");
         $this->assertOutputContains("->table('eav_attribute_sets'");
+        $this->assertOutputContains("->table('eav_entities'");
         $this->assertOutputContains("->addTimestamps('created', 'modified')");
     }
 
@@ -47,6 +48,7 @@ class EavSetupCommandTest extends TestCase
         $this->assertOutputContains('EAV Setup SQL');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attributes');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attribute_sets');
+        $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_entities');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attribute_sets_eav_attributes');
         $this->assertOutputContains('CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_string_lookup');
     }

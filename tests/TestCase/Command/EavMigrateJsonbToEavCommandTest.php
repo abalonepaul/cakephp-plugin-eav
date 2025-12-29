@@ -17,7 +17,7 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
     use ConsoleIntegrationTestTrait;
 
     protected array $fixtures = [
-        'plugin.Eav.Attributes',
+        'plugin.Eav.EavAttributes',
         'plugin.Eav.EavString',
         'plugin.Eav.JsonEntities',
     ];
@@ -40,8 +40,8 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
             $definitions[] = $jsonEntities;
         }
 
-        if (!in_array('attributes', $existing, true)) {
-            $schema = new TableSchema('attributes');
+        if (!in_array('eav_attributes', $existing, true)) {
+            $schema = new TableSchema('eav_attributes');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
@@ -86,7 +86,7 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
         parent::setUp();
         $connection = ConnectionManager::get('test');
         // Truncate target and source tables; attributes can be empty (command creates attribute if needed)
-        $connection->execute('TRUNCATE attributes, eav_string, json_entities CASCADE');
+        $connection->execute('TRUNCATE eav_attributes, eav_string, json_entities CASCADE');
     }
 
     public function testDryRun(): void

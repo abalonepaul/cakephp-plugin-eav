@@ -281,17 +281,24 @@ class EavSetupInteractiveCommand extends Command
 
                 $sql .= "\n-- JSON Storage columns\n";
                 foreach ($jsonColumns as $tableName => $columnName) {
-                    // Only emit ALTER TABLE when a new column was requested
-                    if (!empty($jsonColumnsNew[$tableName])) {
-                        $colType = ($driver instanceof Postgres) ? 'JSONB' : 'JSON';
-                        $sql .= "ALTER TABLE {$tableName} ADD COLUMN {$columnName} {$colType} NULL;\n";
-                    }
+                    // Always emit the column-add DDL in raw SQL output (existence checks are out of scope here)
+                    $colType = ($driver instanceof Postgres) ? 'JSONB' : 'JSON';
+                    $sql .= "ALTER TABLE {$tableName} ADD COLUMN {$columnName} {$colType} NULL;\n";
+
                     if ($driver instanceof Postgres) {
                         $spec = $pgIndexSpec[$tableName] ?? ['gin' => false, 'keys' => []];
                         if (!empty($spec['gin'])) {
                             $ginIdx = "idx_{$tableName}_{$columnName}_gin";
                             $sql .= "CREATE INDEX IF NOT EXISTS {$ginIdx} ON {$tableName} USING GIN ({$columnName});\n";
                         }
+                        if (!empty($spec['keys'])) {
+                            // Index names and creation SQL are generated in the subsequent loop using $safeKey.
+                            foreach ($spec['keys'] as $key) {
+                                $safeKey = preg_replace('/[^a-z0-9_]+/i', '_', strtolower($key));
+                                // no-op here; actual SQL emitted below
+                            }
+                        }
+                        // Emit functional indexes with the correct $safeKey variable
                         if (!empty($spec['keys'])) {
                             foreach ($spec['keys'] as $key) {
                                 $safeKey = preg_replace('/[^a-z0-9_]+/i', '_', strtolower($key));

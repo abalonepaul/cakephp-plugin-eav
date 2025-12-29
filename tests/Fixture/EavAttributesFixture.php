@@ -5,10 +5,26 @@ namespace Eav\Test\Fixture;
 
 use Cake\TestSuite\Fixture\TestFixture;
 
-class AttributesFixture extends TestFixture
+/**
+ * EavAttributesFixture
+ *
+ * Provides canonical attribute rows so FK constraints in
+ * eav_attribute_sets_eav_attributes are satisfied during tests.
+ */
+class EavAttributesFixture extends TestFixture
 {
+    /**
+     * Explicit table name to avoid introspection issues.
+     *
+     * @var string
+     */
     public string $table = 'eav_attributes';
 
+    /**
+     * Schema for eav_attributes so the table is created if missing on the test connection.
+     *
+     * @var array<string, mixed>
+     */
     public array $fields = [
         'id' => ['type' => 'uuid', 'null' => false],
         'name' => ['type' => 'string', 'length' => 191, 'null' => false],
@@ -22,6 +38,13 @@ class AttributesFixture extends TestFixture
         ],
     ];
 
+    /**
+     * Seed two attributes referenced by EavAttributeSetsEavAttributesFixture:
+     * - 1111... => color (string)
+     * - 2222... => spec (json)
+     *
+     * @return void
+     */
     public function init(): void
     {
         $this->records = [
@@ -44,6 +67,7 @@ class AttributesFixture extends TestFixture
                 'modified' => '2024-01-01 00:00:00',
             ],
         ];
+
         parent::init();
     }
 }

@@ -190,7 +190,7 @@ Summary and Confirmation
 
   - Tests and fixtures
     - JsonEntitiesFixture.php (source json_entities table)
-    - AttributesFixture.php, EavStringFixture.php, EavJsonFixture.php
+    - EavAttributesFixture.php, EavStringFixture.php, EavJsonFixture.php
     - EavMigrateJsonbToEavCommandTest.php (uses test connection and json_entities; added TableSchema import; kept setUpBeforeClass)
     - EavCreateAttributeCommandTest.php, EavSetupCommandTest.php
     - EavBehaviorTest.php
@@ -751,6 +751,150 @@ Acceptance
   - Usage badges on attributes index.
   - Delete guardrails for in-use attributes.
   - Attribute sets import/export (JSON) utilities and UI actions.
+
+# Feature 5 — EavEntities / EavAttributes / EavAttributeSets (Final Summary)
+
+Overview
+- Breaking rename: Core registry tables and classes have been prefixed with eav_. The Behavior and Commands now use the canonical registry alias Eav.EavAttributes.
+- New registry model: EavEntities for per-entity EAV defaults/metadata.
+- ORM, CRUD, and baseline UI were baked and refined (badges and delete guardrail).
+- Setup generator updated to emit prefixed registry tables (and raw SQL path includes eav_entities). Interactive wizard fixed for JSON Storage DDL edge cases.
+- Tests updated to the new aliases and fixtures; incomplete controller/unit tests are intentionally deferred to the dedicated Tests feature.
+
+Goals met
+- Registry tables/classes prefixed and grouped for clarity in DB tools.
+- Behavior/Commands cut over to Eav.EavAttributes alias (no legacy alias usage at runtime).
+- Associations wired with Cake 5 conventions (through table name and class).
+- CRUD for Attributes, Attribute Sets, and Entities available under /eav/* routes (via plugin routes).
+- Guardrail prevents deleting attributes that are members of any set.
+- Setup command (migrations and raw_sql) now emits eav_attributes, eav_attribute_sets, eav_attribute_sets_eav_attributes, eav_entities.
+- Interactive setup wizard (raw SQL) fixed for undefined variable and optional JSON Storage DDL emission.
+- Tests stabilized with canonical fixtures/alias, and a new backend guardrail test added.
+
+What was implemented
+- Canonical registry rename and ORM
+    - EavAttributes, EavAttributeSets, EavAttributeSetsEavAttributes, EavEntities models with Timestamp behavior and validations (unique name constraints; correct column lengths).
+    - Associations:
+        - belongsToMany between EavAttributes and EavAttributeSets through eav_attribute_sets_eav_attributes using correct foreign keys (attribute_id, attribute_set_id).
+    - Delete guard in EavAttributesTable: prevents deletion when attribute is used in any set (beforeDelete check).
+    - Usage badge: EavAttributes index shows “Used in X sets” without N+1 (index now contains EavAttributeSets).
+
+- Behavior and Commands alignment
+    - All registry lookups use Eav.EavAttributes:
+        - [EavBehavior](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php) (attributeId, beforeFind rewrite, JSON Storage helpers, etc.)
+        - [EavCreateAttributeCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavCreateAttributeCommand.php)
+        - [EavMigrateJsonbToEavCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php)
+    - JsonColumnStorageTrait: registry lookup switched to Eav.EavAttributes.
+    - Removed legacy “Eav.Attributes” shim.
+
+- Setup generator (non-interactive and interactive)
+    - [EavSetupCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php):
+        - Migrations path now creates eav_attributes, eav_attribute_sets, eav_attribute_sets_eav_attributes, eav_entities.
+        - Raw SQL path now includes eav_entities (plus FKs, unique indexes, timestamps).
+    - [EavSetupInteractiveCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupInteractiveCommand.php):
+        - JSON Storage (raw SQL) always emits ALTER TABLE statements for requested columns (removes undefined $jsonColumnsNew guard).
+        - Fixed stray `$_safeKey` reference; functional index names generated using a properly defined `$safeKey`.
+
+- Routes and UI
+    - Plugin routes under /eav added in [EavPlugin#routes](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/EavPlugin.php#routes) (DashedRoute scope).
+    - Baked controllers and templates for:
+        - [EavAttributesController](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Controller/EavAttributesController.php): index with badges, add/edit with options help.
+        - [EavAttributeSetsController](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Controller/EavAttributeSetsController.php): checkbox-based membership for attributes.
+        - [EavEntitiesController](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Controller/EavEntitiesController.php): baseline form (UX polish deferred to UI feature).
+
+Files added
+- Models/ORM
+    - [Eav\Model\Entity\EavAttribute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Entity/EavAttribute.php)
+    - [Eav\Model\Entity\EavAttributeSet](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Entity/EavAttributeSet.php)
+    - [Eav\Model\Entity\EavEntity](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Entity/EavEntity.php)
+    - [Eav\Model\Table\EavAttributesTable](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Table/EavAttributesTable.php)
+    - [Eav\Model\Table\EavAttributeSetsTable](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Table/EavAttributeSetsTable.php)
+    - [Eav\Model\Table\EavAttributeSetsEavAttributesTable](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Table/EavAttributeSetsEavAttributesTable.php)
+    - [Eav\Model\Table\EavEntitiesTable](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Table/EavEntitiesTable.php)
+
+- Controllers/UI
+    - [Eav\Controller\EavAttributesController](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Controller/EavAttributesController.php)
+    - [Eav\Controller\EavAttributeSetsController](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Controller/EavAttributeSetsController.php)
+    - [Eav\Controller\EavEntitiesController](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Controller/EavEntitiesController.php)
+    - Templates for EavAttributes, EavAttributeSets, EavEntities (index/view/add/edit) under plugins/Eav/templates/*
+
+- Tests/Fixtures
+    - [EavAttributesTableTest](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/TestCase/Model/Table/EavAttributesTableTest.php) — delete guardrails (added)
+    - Junction fixture with schema:
+        - [EavAttributeSetsEavAttributesFixture](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/Fixture/EavAttributeSetsEavAttributesFixture.php) ($fields defined; composite PK)
+    - Registry fixtures:
+        - [EavAttributesFixture](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/Fixture/EavAttributesFixture.php)
+        - [AttributeSetsFixture](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/Fixture/AttributeSetsFixture.php)
+    - Behavior tests updated to use Eav.EavAttributes alias and eav_* fixtures.
+
+Files modified (highlights)
+- Behavior
+    - [EavBehavior](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php): cutover to Eav.EavAttributes, join/projection fixes, JSON Storage mode kept consistent.
+    - [JsonColumnStorageTrait](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/JsonColumnStorageTrait.php): registry lookup updated.
+
+- Commands
+    - [EavSetupCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php): prefixed registry tables; raw SQL includes eav_entities.
+    - [EavSetupInteractiveCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupInteractiveCommand.php): raw SQL JSON column DDL fix; `$_safeKey` fix; header augmented with storageDefault/jsonColumns metadata.
+    - [EavMigrateJsonbToEavCommand](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php): lookup alias updated; tests adjusted.
+
+- Plugin
+    - [EavPlugin](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/EavPlugin.php): /eav scope routes (DashedRoute), CLI command registrations.
+
+Files removed
+- Legacy registry shim and fixture
+    - plugins/Eav/src/Model/Table/AttributesTable.php (shim)
+    - plugins/Eav/src/Model/Entity/Attribute.php (legacy entity)
+    - plugins/Eav/tests/Fixture/AttributesFixture.php (unprefixed fixture)
+
+Tests created/modified
+- Created
+    - [EavAttributesTableTest](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/TestCase/Model/Table/EavAttributesTableTest.php): verifies delete guard prevents deletion when in use; allows deletion when unused.
+
+- Modified
+    - [EavSetupCommandTest](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/TestCase/Command/EavSetupCommandTest.php): expects eav_* core tables including eav_entities in both migration and raw SQL dry-runs.
+    - [EavMigrateJsonbToEavCommandTest](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/TestCase/Command/EavMigrateJsonbToEavCommandTest.php): alias/fixtures aligned; test bootstrap adjusted to eav_attributes/eav_string where needed.
+    - [EavBehaviorTest](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/TestCase/Model/Behavior/EavBehaviorTest.php), [EavTablesStorageModeTest](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/TestCase/Model/Behavior/EavTablesStorageModeTest.php): switched to Eav.EavAttributes and eav_* fixtures; schema bootstraps updated.
+    - Controller tests remain marked Incomplete per plan (to be handled in the Tests feature).
+
+Nice-to-haves and polish (partially implemented; remainder deferred)
+- Badge: “Used in X sets” on EavAttributes index — implemented.
+- Delete guardrail backend — implemented (Table beforeDelete).
+- Options field help text and textarea — implemented in add/edit templates.
+- Attribute sets import/export JSON — deferred to a later feature.
+- EavEntities UX enhancements (auto-detect PK/JSON columns via AJAX) — deferred to UI feature.
+
+Commands executed (runbook used)
+- Setup (migrations dry-run and write):
+    - `bin/cake eav setup --dry-run --connection default --pk-type uuid --uuid-type nativeuuid --json-storage json --types defaults --name EavSetup`
+    - `bin/cake eav setup --connection default --pk-type uuid --uuid-type nativeuuid --json-storage json --types defaults --name EavSetup`
+    - `bin/cake migrations migrate -p Eav`
+    - `bin/cake migrations migrate -p Eav -c test`
+- Tests:
+    - `vendor/bin/phpunit plugins/Eav/tests`
+    - Coverage as needed: `XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-text --testdox plugins/Eav/tests`
+
+Acceptance criteria (met)
+- Models and associations:
+    - EavAttributesTable/EavAttributeSetsTable/EavAttributeSetsEavAttributesTable/EavEntitiesTable exist, map to eav_* tables, and apply Timestamp behavior and validations (unique name, column lengths). Associations wired with correct foreignKey/targetForeignKey and through table.
+- CRUD:
+    - Controllers and templates baked for EavAttributes, EavAttributeSets, EavEntities. Attribute set membership manageable via checkboxes (junction controller not required).
+- Behavior/Commands:
+    - All registry lookups updated to Eav.EavAttributes. Tests and fixtures aligned with prefixed naming.
+- Setup generator:
+    - Emits eav_* tables including eav_entities for both migrations and raw SQL. Interactive command’s raw SQL JSON-add path fixed (no undefined variables).
+- Nice-to-haves:
+    - Usage badges on attributes index (yes).
+    - Delete guardrail backend for in-use attributes (yes).
+    - Import/export (deferred).
+
+Known deferrals (explicitly accepted for later features)
+- Controller/template tests (CRUD flows).
+- EavEntities form UX improvements (auto-fill, JSON column detection via AJAX).
+- Attribute set import/export endpoints and tests.
+- UI formatting for JSON options display in indexes/views.
+
+Outcome
+- Feature 5 is complete. The plugin now fully uses prefixed registry tables/classes, provides working CRUD for EAV registries, enforces safe deletion, and exposes a setup path that generates the canonical schema. Remaining UI polish and test coverage gaps are planned in dedicated features and do not block this feature’s acceptance.
 
 ## Feature 6 — Command connection handling
 - Auto-detect default datasource; prompt if multiple.

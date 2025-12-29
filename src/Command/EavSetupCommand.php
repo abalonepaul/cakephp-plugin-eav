@@ -489,6 +489,22 @@ class {$className} extends AbstractMigration
                 ->create();
         }
 
+        // New: eav_entities registry table
+        if (!\$this->hasTable('eav_entities')) {
+            \$this->table('eav_entities', ['id' => false, 'primary_key' => ['id']])
+                ->addColumn('id', '{$uuidType}', ['null' => false])
+                ->addColumn('name', 'string', ['limit' => 191, 'null' => false])
+                ->addColumn('model_alias', 'string', ['limit' => 191, 'null' => true])
+                ->addColumn('table_name', 'string', ['limit' => 191, 'null' => true])
+                ->addColumn('storage_default', 'string', ['limit' => 20, 'null' => false, 'default' => 'tables'])
+                ->addColumn('json_column', 'string', ['limit' => 191, 'null' => true])
+                ->addColumn('pk_type', 'string', ['limit' => 10, 'null' => false, 'default' => 'uuid'])
+                ->addColumn('uuid_subtype', 'string', ['limit' => 20, 'null' => true])
+                ->addTimestamps('created', 'modified')
+                ->addIndex(['name'], ['unique' => true, 'name' => 'idx_eav_entities_name'])
+                ->create();
+        }
+
         if (!\$this->hasTable('eav_attribute_sets_eav_attributes')) {
             \$this->table('eav_attribute_sets_eav_attributes', ['id' => false, 'primary_key' => ['attribute_set_id', 'attribute_id']])
                 ->addColumn('attribute_set_id', '{$uuidType}', ['null' => false])
@@ -550,6 +566,7 @@ PHP;
             $counter++;
             $base = $path . '/' . $timestamp . '_' . Inflector::underscore($name) . "_{$counter}.php";
         }
+
 
         return $base;
     }
@@ -691,6 +708,23 @@ PHP;
         $ddl[] = "  PRIMARY KEY (id)";
         $ddl[] = ");";
         $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_attribute_sets_name ON eav_attribute_sets (name);";
+        $ddl[] = "";
+
+        // New: eav_entities registry table
+        $ddl[] = "CREATE TABLE IF NOT EXISTS eav_entities (";
+        $ddl[] = "  id {$idCol} NOT NULL,";
+        $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
+        $ddl[] = "  model_alias " . $mapVarchar(191) . " NULL,";
+        $ddl[] = "  table_name " . $mapVarchar(191) . " NULL,";
+        $ddl[] = "  storage_default " . $mapVarchar(20) . " NOT NULL,";
+        $ddl[] = "  json_column " . $mapVarchar(191) . " NULL,";
+        $ddl[] = "  pk_type " . $mapVarchar(10) . " NOT NULL,";
+        $ddl[] = "  uuid_subtype " . $mapVarchar(20) . " NULL,";
+        $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  PRIMARY KEY (id)";
+        $ddl[] = ");";
+        $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_entities_name ON eav_entities (name);";
         $ddl[] = "";
 
         $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attribute_sets_eav_attributes (";

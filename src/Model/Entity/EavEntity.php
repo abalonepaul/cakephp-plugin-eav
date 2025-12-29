@@ -6,17 +6,20 @@ namespace Eav\Model\Entity;
 use Cake\ORM\Entity;
 
 /**
- * EavAttribute Entity
+ * EavEntity Entity
  *
  * @property string $id
  * @property string $name
- * @property string|null $label
- * @property string $data_type
- * @property array $options
+ * @property string|null $model_alias
+ * @property string|null $table_name
+ * @property string $storage_default
+ * @property string|null $json_column
+ * @property string $pk_type
+ * @property string|null $uuid_subtype
  * @property \Cake\I18n\DateTime $created
  * @property \Cake\I18n\DateTime|null $modified
  */
-class EavAttribute extends Entity
+class EavEntity extends Entity
 {
     /**
      * Fields that can be mass assigned using newEntity() or patchEntity().
@@ -29,9 +32,12 @@ class EavAttribute extends Entity
      */
     protected array $_accessible = [
         'name' => true,
-        'label' => true,
-        'data_type' => true,
-        'options' => true,
+        'model_alias' => true,
+        'table_name' => true,
+        'storage_default' => true,
+        'json_column' => true,
+        'pk_type' => true,
+        'uuid_subtype' => true,
         'created' => true,
         'modified' => true,
     ];

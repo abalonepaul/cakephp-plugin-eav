@@ -17,7 +17,7 @@ class EavCreateAttributeCommandTest extends TestCase
     use ConsoleIntegrationTestTrait;
 
     protected array $fixtures = [
-        'plugin.Eav.Attributes',
+        'plugin.Eav.EavAttributes',
     ];
 
     public static function setUpBeforeClass(): void
@@ -49,7 +49,7 @@ class EavCreateAttributeCommandTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $Attributes = TableRegistry::getTableLocator()->get('Eav.Attributes');
+        $Attributes = TableRegistry::getTableLocator()->get('Eav.EavAttributes');
         $Attributes->deleteAll([]);
     }
 
@@ -59,7 +59,7 @@ class EavCreateAttributeCommandTest extends TestCase
         $this->assertExitSuccess();
         $this->assertOutputContains('Created attribute color (string)');
 
-        $Attributes = TableRegistry::getTableLocator()->get('Eav.Attributes');
+        $Attributes = TableRegistry::getTableLocator()->get('Eav.EavAttributes');
         $attr = $Attributes->find()->where(['name' => 'color'])->firstOrFail();
         $this->assertSame('string', $attr->data_type);
         $this->assertSame('Color', $attr->label);
@@ -75,7 +75,7 @@ class EavCreateAttributeCommandTest extends TestCase
         $this->assertExitSuccess();
         $this->assertOutputContains('Attribute already exists: color');
 
-        $Attributes = TableRegistry::getTableLocator()->get('Eav.Attributes');
+        $Attributes = TableRegistry::getTableLocator()->get('Eav.EavAttributes');
         $count = $Attributes->find()->where(['name' => 'color'])->count();
         $this->assertSame(1, $count);
     }

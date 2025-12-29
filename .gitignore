@@ -10,3 +10,6 @@ AGENTS-VSCode.md
 /config/Migrations/20251227082532_eav_setup_tables.php
 /config/Migrations/20251227083656_add_json_columns.php
 /config/eav.json
+/config/Sql/20251228204211_eav_setup_postgres.sql
+/config/Migrations/20251228222358_eav_setup.php
+/config/Migrations/20251228222416_eav_setup_test.php
