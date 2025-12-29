@@ -897,9 +897,30 @@ Outcome
 - Feature 5 is complete. The plugin now fully uses prefixed registry tables/classes, provides working CRUD for EAV registries, enforces safe deletion, and exposes a setup path that generates the canonical schema. Remaining UI polish and test coverage gaps are planned in dedicated features and do not block this feature’s acceptance.
 
 ## Feature 6 — Command connection handling
-- Auto-detect default datasource; prompt if multiple.
-- Keep optional flags for CI but not required for interactive use.
-- Maintain Postgres guard for JSONB in [EavMigrateJsonbToEavCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php#execute).
+
+Goals
+- Ensure every CLI command works correctly across multiple connections with minimal flags.
+- Provide consistent “detect default; prompt if multiple” UX for interactive flows and a deterministic flags path for CI/non-interactive.
+- Maintain driver guards where applicable (e.g., JSONB and Postgres-only operations).
+
+Current status (what’s already done)
+- Interactive Setup (wizard):
+  - Lists configured connections (default highlighted), then persists choice to eav.json. See [EavSetupInteractiveCommand#runInteractive](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupInteractiveCommand.php#runInteractive).
+- Non-interactive Setup:
+  - Respects --connection flag; prints “bin/cake migrations migrate -p Eav -c <connection>” in output. See [EavSetupCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavSetupCommand.php#execute).
+- JSONB migrator:
+  - Accepts --connection and guards Postgres-only JSONB features. See [EavMigrateJsonbToEavCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php#execute).
+
+What remains
+- Create Attribute command:
+  - Add optional --connection for environments with multiple datasources, and pass it through TableLocator (['connectionName' => ...]) for Eav.EavAttributes. Default remains “default” when not provided. See [EavCreateAttributeCommand#execute](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavCreateAttributeCommand.php#execute).
+- Docs:
+  - Document that all commands accept --connection (where applicable), and that interactive flows detect/prompt automatically.
+
+Acceptance
+- All commands that touch the database honor an explicit --connection flag or derive the connection via interactive detection (wizard).
+- Postgres-only features remain guarded; non-Postgres runs fall back with clear notices.
+- Create Attribute honors --connection and writes to the intended datasource.
 
 ## Feature 7 — Behavior consistency and finder
 
@@ -1041,21 +1062,66 @@ Acceptance
    - All plugin tests pass locally against Postgres with PHP 8.1, validating JSON and tables storage modes, command behavior, and setup generation.
    - Feature 7’s goals are achieved; the behavior now makes EAV attributes first-class citizens in ORM query building with sensible defaults and escape hatches.
 
-## Feature 8 — Tests
-- Rename fixtures from av_* to eav_*; switch ‘val’ to ‘value’; ensure unified entity_id across fixtures.
-- Update tests that assumed AvJsonbUuid class naming (canonicalize to EavJson).
-- Add tests for interactive Setup (simulated answers), UUID subtype recommendations, and type selection.
-- Add CRUD tests for EavAttributes/EavAttributeSets/EavEntities.
-- Add regression coverage for jsonEncodeOnWrite true/false.
+## Feature 8 — Tests (Unit, Integration, and UI) — Target 100% coverage
 
-## Feature 9 — UI scaffolding (bake)
-- Bake CRUD for:
-  - EavAttributes
-  - EavAttributeSets
-  - EavAttributeSetAttributes
-  - EavEntities
-- Basic forms for adding attributes and organizing sets per entity.
-- Controller/View route naming can follow plugin defaults; no additional “Eav” prefix in URLs is required beyond the plugin name (Eav).
+Goals
+- Achieve 100% coverage across behavior, commands, models, and controller integration tests for the baked UI.
+- Ensure storage-mode parity (tables vs JSON Storage) for query rewriting, projections, ordering, and writes.
+
+Scope
+- Behavior unit tests (completed/expanded in prior features):
+  - JSON Storage Mode and Tables Mode: where/order/select rewriting; typed projections/hydration; writes (jsonb_set).
+  - Regression tests for jsonEncodeOnWrite true/false.
+- Command tests:
+  - Setup (non-interactive and interactive dry-run) and raw SQL generation on supported drivers.
+  - Migrate JSONB → EAV: dry-run/apply, batching, connection handling, and guards.
+  - Create Attribute: success, duplicate no-op, and (new) --connection coverage.
+- Model tests:
+  - EavAttributes/EavAttributeSets/EavAttributeSetsEavAttributes/EavEntities: validations, rules, and associations.
+  - Guardrails: beforeDelete prevention when attributes are in use.
+- Controller/UI integration tests (new in this feature):
+  - EavAttributesController: index/view/add/edit/delete happy paths; membership field posted via EavAttributeSets; flash assertions.
+  - EavAttributeSetsController: index/view/add/edit/delete happy paths; checkbox membership post and persistence.
+  - EavEntitiesController: index/view/add/edit/delete happy paths; form defaults and visibility rules (json_column shown only when storage_default=json_column).
+  - Paginator and sorting: ensure standard fields are sortable; “Actions” column is not sortable.
+- Coverage:
+  - Aim for 100% line coverage (Xdebug or PCOV), with practical exclusions only for boilerplate plugin routing/bootstrap.
+
+Acceptance
+- vendor/bin/phpunit reports 100% coverage (or a documented near-100% where framework bootstraps are excluded).
+- All controller integration tests pass against the test connection.
+- No UI sort attempts on the “Actions” column; headers labeled plainly (no Paginator->sort on Actions).
+
+## Feature 9 — UI scaffolding (bake) and polish
+
+Status
+- CRUD has been baked for EavAttributes, EavAttributeSets, and EavEntities under plugin routes (/eav/*).
+- Baseline enhancements added (badges on attributes; delete guard messaging; form help text).
+
+Polish and usability updates
+- Index tables:
+  - Replace Paginator->sort('actions') with plain header labels (Actions should never be sortable).
+  - Ensure consistent column counts and <thead>/<tbody> structure across all indexes.
+- Attributes:
+  - Badge: “Used in X sets” without N+1 queries (use contain on index) — done; verify performance.
+  - Options: Consider formatting JSON (truncate/tooltip) for readability.
+- Attribute Sets:
+  - Membership selection via checkboxes — done; optionally add ordering UI (position) later.
+- Entities:
+  - Smart defaults — done (applySmartDefaults).
+  - Improve UX hints and visibility (json_column only when storage_default=json_column) — done; refine as needed.
+- Global
+  - Flash messages and validation error summaries consistent across controllers.
+  - Pagination/sorting verified on sortable columns; Actions column not sortable.
+  - Route fallback under /eav remains stable.
+
+Acceptance
+- All CRUD screens are usable, with no sort errors on Actions and correct table markup.
+- Membership changes persist correctly through the join table.
+- Entity form behavior is intuitive; storage_default toggles json_column field visibility.
+
+Note
+- Controller integration tests for these flows will be implemented in Feature 8 to reach 100% coverage.
 
 ## Feature 10 — Documentation
 - Rewrite README with:
@@ -1065,9 +1131,6 @@ Acceptance
   - UUID subtype recommendations by driver.
   - jsonEncodeOnWrite and hydration expectations.
   - Behavior attachment and mapping examples.
-  - AttributeSets and EavEntities usage.
-  - Raw SQL vs Migrations options.
-- Maintain a CHANGELOG for notable plan/architecture changes.
 
 Storage modes and when to choose which
 - Typed EAV tables (“tables” storage, default):
@@ -1313,3 +1376,137 @@ Acceptance (for Feature 11)
 - eav.json persistence and rawSql pointer updates are performed by ConfigRepository.
 - Public helper methods on EavSetupCommand exist as shims and are marked deprecated.
 - Unit tests cover new service components; command tests remain green without changes to their assertions.
+
+## Feature 12 — Migrate Native Fields to EAV (New)
+
+Goals
+- Provide a command to migrate one or more native columns from a source table into EAV attributes and values.
+- Complement the existing JSONB → EAV migrator with the more common “native columns to EAV” path.
+
+Scope
+- New command: eav migrate_fields_to_eav <table> --columns col1:type,col2:type --entity-table <name> --pk uuid|int [--connection] [--dry-run] [--batch-size N] [--drop-columns]
+  - Validates each column exists and resolves types (aliases via TypeFactory/custom).
+  - Creates attributes if missing (name = column, data_type = resolved type).
+  - Copies non-null values into eav_<type> rows with (entity_table, entity_id, attribute_id, value) in batches.
+  - Optional --drop-columns flag prints a migration/SQL template to drop columns after verification (guarded; not executed automatically).
+- Safety:
+  - Dry-run mode shows counts and sample previews; no DB writes.
+  - Apply mode batches inserts (transaction per batch) and logs a final summary.
+- Drivers:
+  - Postgres and MySQL supported initially; SQL Server/SQLite can be added later.
+
+Implementation notes
+- Use EavBehavior#saveEavValue for write-path consistency.
+- Type resolution favors explicit CSV types; supports alias normalization (int->integer, jsonb->json, fk_uuid/fk_int->fk).
+- Allow specifying a different entity_table label than the source table if needed.
+- Ensure modified timestamps are updated for target eav_* tables.
+
+Tests
+- Command integration tests:
+  - Dry-run: counts by column and top-N preview.
+  - Apply: migrates values correctly, creates attributes, and writes to the correct eav_* tables.
+  - Error paths: unknown table/column, unsupported type, invalid connection.
+- Behavior smoke test: migrated rows are visible via standard ORM queries using EAV projections.
+
+Acceptance
+- Dry-run prints accurate counts and previews without writes.
+- Apply mode migrates values and creates missing attributes.
+- Summary includes totals per column and per type table; errors are explicit.
+- Optional “drop columns” template is printed on request but not executed automatically.
+
+## Feature 13 — Attribute Sets Import/Export, Usage Badges, and Delete Guardrails
+
+Goals
+- Improve admin UX and portability of attribute configuration across environments.
+
+Scope
+- Import/Export (JSON)
+  - Export endpoint/command: dumps attribute sets to JSON (set name + member attributes with positions).
+  - Import endpoint/command: reads JSON and applies idempotently (creates missing attributes/sets/links; updates positions).
+  - Optional flags: --update-positions-only, --fail-on-missing-attributes.
+- Usage badges (enhanced)
+  - “Used in X sets” already implemented for attributes; ensure efficient counting and no N+1 queries across lists.
+  - Add usage display for sets (e.g., number of attributes) on the sets index.
+- Delete guardrails (enhanced)
+  - Already implemented in backend for EavAttributes (prevents deletion when in use).
+  - Add an explicit “force delete” CLI option for scripted cleanups (with confirmation).
+  - Improve UI messaging and add pre-delete summary (e.g., list of sets referencing the attribute).
+
+Implementation notes
+- JSON format: simple, stable schema:
+  {
+    "sets": [
+      {
+        "name": "Default Set",
+        "attributes": [
+          {"name": "color", "position": 1},
+          {"name": "spec", "position": 2}
+        ]
+      }
+    ]
+  }
+- Import idempotency: use findOrCreate by name for sets/attributes; update junction with position when provided.
+
+Tests
+- Export/import roundtrip test: export → truncate → import → compare counts and relations.
+- Delete guard tests: UI/command attempts to delete in-use attribute = blocked; force mode allows with explicit confirm.
+- Usage badges correctness: assert counts reflect fixture state.
+
+Acceptance
+- Export produces JSON that can be re-imported without duplicates.
+- Import applies set membership and positions correctly.
+- Badges show accurate usage counts on index pages.
+- Deleting an in-use attribute is blocked by default with clear messaging; force path available only in CLI with explicit confirm.
+
+## Feature 14 — EavEntities ↔ EavAttributeSets association (Many-to-Many)
+
+Rationale
+- EavEntities (registry) and EavAttributeSets exist but are not currently associated. Associating sets to entities enables reusable small sets and flexible grouping per entity.
+
+Schema
+- New junction table: eav_entities_eav_attribute_sets
+  - Columns: entity_id (uuid), attribute_set_id (uuid), position (int, nullable, default 0)
+  - PK: (entity_id, attribute_set_id)
+  - FKs: entity_id → eav_entities(id) ON DELETE CASCADE; attribute_set_id → eav_attribute_sets(id) ON DELETE CASCADE
+  - Timestamps not required for the junction.
+
+Setup generator
+- Update migration/raw SQL builders (EavSetupCommand) to create eav_entities_eav_attribute_sets with PK and FKs (driver-aware DDL).
+
+ORM
+- EavEntitiesTable:
+  - belongsToMany('EavAttributeSets', [
+      'className' => 'Eav.EavAttributeSets',
+      'targetForeignKey' => 'attribute_set_id',
+      'foreignKey' => 'entity_id',
+      'through' => 'Eav.EavEntitiesEavAttributeSets',
+      'joinTable' => 'eav_entities_eav_attribute_sets',
+    ])
+- EavAttributeSetsTable (optional reverse):
+  - belongsToMany('EavEntities', [
+      'className' => 'Eav.EavEntities',
+      'targetForeignKey' => 'entity_id',
+      'foreignKey' => 'attribute_set_id',
+      'through' => 'Eav.EavEntitiesEavAttributeSets',
+      'joinTable' => 'eav_entities_eav_attribute_sets',
+    ])
+- New model: EavEntitiesEavAttributeSetsTable with composite PK and optional position field.
+
+UI
+- EavEntities add/edit forms:
+  - Checkbox-based selection to attach attribute sets to an entity.
+  - Optional numeric position field for ordering (if enabled).
+- EavAttributeSets (optional reverse):
+  - Read-only list of associated entities.
+
+Tests
+- Fixture for eav_entities_eav_attribute_sets (schema + minimal seed).
+- Model tests:
+  - Attaching/detaching sets to entities persists correctly (junction rows).
+  - Deleting an entity/set cascades junction rows.
+- Controller tests:
+  - Posting entity form with selected sets creates/updates junction rows.
+  - Listings show associated sets/entities as expected.
+
+Acceptance
+- Entities can be associated with multiple attribute sets via ManyToMany link.
