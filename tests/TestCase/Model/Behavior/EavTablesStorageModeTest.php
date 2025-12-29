@@ -14,7 +14,7 @@ use Cake\TestSuite\TestCase;
 class EavTablesStorageModeTest extends TestCase
 {
     protected array $fixtures = [
-        'plugin.Eav.Attributes',
+        'plugin.Eav.EavAttributes',
         'plugin.Eav.EavString',
         'plugin.Eav.TestEntities',
     ];

@@ -107,10 +107,10 @@ trait JsonColumnStorageTrait
             return strtolower((string)$map[$attr]);
         }
 
-        // Lookup in Eav.Attributes if present (CakePHP 5.x: use TableLocator via Behavior).
+        // Lookup in Eav.EavAttributes if present (CakePHP 5.x: use TableLocator via Behavior).
         try {
             /** @var \Cake\ORM\Behavior $this */
-            $Attributes = $this->getTableLocator()->get('Eav.Attributes');
+            $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
             $row = $Attributes->find()
                 ->select(['data_type'])
                 ->where(['name' => $attr])

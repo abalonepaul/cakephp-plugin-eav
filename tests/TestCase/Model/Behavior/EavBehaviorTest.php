@@ -39,7 +39,7 @@ class TestEavBehavior extends EavBehavior
 class EavBehaviorTest extends TestCase
 {
     protected array $fixtures = [
-        'plugin.Eav.Attributes',
+        'plugin.Eav.EavAttributes',
         'plugin.Eav.EavString',
         'plugin.Eav.EavJson',
     ];
@@ -52,8 +52,8 @@ class EavBehaviorTest extends TestCase
         $existing = $connection->getSchemaCollection()->listTables();
         $definitions = [];
 
-        if (!in_array('attributes', $existing, true)) {
-            $schema = new TableSchema('attributes');
+        if (!in_array('eav_attributes', $existing, true)) {
+            $schema = new TableSchema('eav_attributes');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
@@ -182,7 +182,7 @@ class EavBehaviorTest extends TestCase
         $entityId = '33333333-3333-3333-3333-333333333333';
         $this->behavior->saveEavValue($entityId, 'legacy_code', 'varchar', 'LX-1');
 
-        $Attributes = TableRegistry::getTableLocator()->get('Eav.Attributes');
+        $Attributes = TableRegistry::getTableLocator()->get('Eav.EavAttributes');
         $attr = $Attributes->find()->where(['name' => 'legacy_code'])->first();
         $this->assertNotEmpty($attr);
         $this->assertSame('string', $attr->data_type);

@@ -23,8 +23,9 @@ class EavSetupCommandTest extends TestCase
         $this->assertOutputContains('Dry run - migration not written.');
         $this->assertOutputContains('EAV Setup Migration');
         $this->assertOutputContains('class EavSetup extends AbstractMigration');
-        $this->assertOutputContains("->table('attributes'");
-        $this->assertOutputContains("->table('attribute_sets'");
+        $this->assertOutputContains("->table('eav_attributes'");
+        $this->assertOutputContains("->table('eav_attribute_sets'");
+        $this->assertOutputContains("->table('eav_entities'");
         $this->assertOutputContains("->addTimestamps('created', 'modified')");
     }
 
@@ -45,9 +46,10 @@ class EavSetupCommandTest extends TestCase
         $this->assertExitSuccess();
         $this->assertOutputContains('Dry run - SQL not written.');
         $this->assertOutputContains('EAV Setup SQL');
-        $this->assertOutputContains('CREATE TABLE IF NOT EXISTS attributes');
-        $this->assertOutputContains('CREATE TABLE IF NOT EXISTS attribute_sets');
-        $this->assertOutputContains('CREATE TABLE IF NOT EXISTS attribute_set_attributes');
+        $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attributes');
+        $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attribute_sets');
+        $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_entities');
+        $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attribute_sets_eav_attributes');
         $this->assertOutputContains('CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_string_lookup');
     }
 
@@ -86,7 +88,7 @@ class EavSetupCommandTest extends TestCase
 
         if ($isPg || $isMy) {
             $this->assertOutputContains('EAV Setup SQL', 'Expected raw SQL output when driver supports it');
-            $this->assertOutputContains('CREATE TABLE IF NOT EXISTS attributes');
+            $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attributes');
         } else {
             $this->assertOutputContains('EAV Setup Migration', 'Expected fallback to migrations on unsupported driver');
             $this->assertOutputContains('class EavSetup extends AbstractMigration');

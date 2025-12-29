@@ -468,34 +468,50 @@ class {$className} extends AbstractMigration
 {
     public function change(): void
     {
-        if (!\$this->hasTable('attributes')) {
-            \$this->table('attributes', ['id' => false, 'primary_key' => ['id']])
+        if (!\$this->hasTable('eav_attributes')) {
+            \$this->table('eav_attributes', ['id' => false, 'primary_key' => ['id']])
                 ->addColumn('id', '{$uuidType}', ['null' => false])
                 ->addColumn('name', 'string', ['limit' => 191, 'null' => false])
                 ->addColumn('label', 'string', ['limit' => 255, 'null' => true])
                 ->addColumn('data_type', 'string', ['limit' => 50, 'null' => false])
                 ->addColumn('options', 'json', ['null' => false])
                 ->addTimestamps('created', 'modified')
-                ->addIndex(['name'], ['unique' => true, 'name' => 'idx_attributes_name'])
+                ->addIndex(['name'], ['unique' => true, 'name' => 'idx_eav_attributes_name'])
                 ->create();
         }
 
-        if (!\$this->hasTable('attribute_sets')) {
-            \$this->table('attribute_sets', ['id' => false, 'primary_key' => ['id']])
+        if (!\$this->hasTable('eav_attribute_sets')) {
+            \$this->table('eav_attribute_sets', ['id' => false, 'primary_key' => ['id']])
                 ->addColumn('id', '{$uuidType}', ['null' => false])
                 ->addColumn('name', 'string', ['limit' => 191, 'null' => false])
                 ->addTimestamps('created', 'modified')
-                ->addIndex(['name'], ['unique' => true, 'name' => 'idx_attribute_sets_name'])
+                ->addIndex(['name'], ['unique' => true, 'name' => 'idx_eav_attribute_sets_name'])
                 ->create();
         }
 
-        if (!\$this->hasTable('attribute_set_attributes')) {
-            \$this->table('attribute_set_attributes', ['id' => false, 'primary_key' => ['attribute_set_id', 'attribute_id']])
+        // New: eav_entities registry table
+        if (!\$this->hasTable('eav_entities')) {
+            \$this->table('eav_entities', ['id' => false, 'primary_key' => ['id']])
+                ->addColumn('id', '{$uuidType}', ['null' => false])
+                ->addColumn('name', 'string', ['limit' => 191, 'null' => false])
+                ->addColumn('model_alias', 'string', ['limit' => 191, 'null' => true])
+                ->addColumn('table_name', 'string', ['limit' => 191, 'null' => true])
+                ->addColumn('storage_default', 'string', ['limit' => 20, 'null' => false, 'default' => 'tables'])
+                ->addColumn('json_column', 'string', ['limit' => 191, 'null' => true])
+                ->addColumn('pk_type', 'string', ['limit' => 10, 'null' => false, 'default' => 'uuid'])
+                ->addColumn('uuid_subtype', 'string', ['limit' => 20, 'null' => true])
+                ->addTimestamps('created', 'modified')
+                ->addIndex(['name'], ['unique' => true, 'name' => 'idx_eav_entities_name'])
+                ->create();
+        }
+
+        if (!\$this->hasTable('eav_attribute_sets_eav_attributes')) {
+            \$this->table('eav_attribute_sets_eav_attributes', ['id' => false, 'primary_key' => ['attribute_set_id', 'attribute_id']])
                 ->addColumn('attribute_set_id', '{$uuidType}', ['null' => false])
                 ->addColumn('attribute_id', '{$uuidType}', ['null' => false])
                 ->addColumn('position', 'integer', ['null' => true, 'default' => 0])
-                ->addForeignKey('attribute_set_id', 'attribute_sets', 'id', ['delete' => 'CASCADE'])
-                ->addForeignKey('attribute_id', 'attributes', 'id', ['delete' => 'CASCADE'])
+                ->addForeignKey('attribute_set_id', 'eav_attribute_sets', 'id', ['delete' => 'CASCADE'])
+                ->addForeignKey('attribute_id', 'eav_attributes', 'id', ['delete' => 'CASCADE'])
                 ->create();
         }
 
@@ -516,7 +532,7 @@ class {$className} extends AbstractMigration
                 ->addColumn('value', \$spec['valType'], array_merge(\$spec['valOptions'], ['null' => true]))
                 ->addTimestamps('created', 'modified')
                 ->addIndex(['entity_table', '{$entityField}', 'attribute_id'], ['unique' => true, 'name' => 'idx_' . \$spec['table'] . '_lookup'])
-                ->addForeignKey('attribute_id', 'attributes', 'id', ['delete' => 'CASCADE'])
+                ->addForeignKey('attribute_id', 'eav_attributes', 'id', ['delete' => 'CASCADE'])
                 ->create();
         }
     }
@@ -550,6 +566,7 @@ PHP;
             $counter++;
             $base = $path . '/' . $timestamp . '_' . Inflector::underscore($name) . "_{$counter}.php";
         }
+
 
         return $base;
     }
@@ -663,14 +680,14 @@ PHP;
             $lines[] = ");";
             $lines[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_{$table}_lookup ON {$table} (entity_table, entity_id, attribute_id);";
             // PG add FK with ON DELETE CASCADE; MySQL can do the same
-            $lines[] = "ALTER TABLE {$table} ADD CONSTRAINT fk_{$table}_attribute_id FOREIGN KEY (attribute_id) REFERENCES attributes(id) ON DELETE CASCADE;";
+            $lines[] = "ALTER TABLE {$table} ADD CONSTRAINT fk_{$table}_attribute_id FOREIGN KEY (attribute_id) REFERENCES eav_attributes(id) ON DELETE CASCADE;";
             return implode("\n", $lines) . "\n";
         };
 
         // Attributes core tables
         $ddl = [];
         $ddl[] = "-- Core attribute registry tables";
-        $ddl[] = "CREATE TABLE IF NOT EXISTS attributes (";
+        $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attributes (";
         $ddl[] = "  id {$idCol} NOT NULL,";
         $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
         $ddl[] = "  label " . $mapVarchar(255) . " NULL,";
@@ -680,27 +697,44 @@ PHP;
         $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  PRIMARY KEY (id)";
         $ddl[] = ");";
-        $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_attributes_name ON attributes (name);";
+        $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_attributes_name ON eav_attributes (name);";
         $ddl[] = "";
 
-        $ddl[] = "CREATE TABLE IF NOT EXISTS attribute_sets (";
+        $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attribute_sets (";
         $ddl[] = "  id {$idCol} NOT NULL,";
         $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
         $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  PRIMARY KEY (id)";
         $ddl[] = ");";
-        $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_attribute_sets_name ON attribute_sets (name);";
+        $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_attribute_sets_name ON eav_attribute_sets (name);";
         $ddl[] = "";
 
-        $ddl[] = "CREATE TABLE IF NOT EXISTS attribute_set_attributes (";
+        // New: eav_entities registry table
+        $ddl[] = "CREATE TABLE IF NOT EXISTS eav_entities (";
+        $ddl[] = "  id {$idCol} NOT NULL,";
+        $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
+        $ddl[] = "  model_alias " . $mapVarchar(191) . " NULL,";
+        $ddl[] = "  table_name " . $mapVarchar(191) . " NULL,";
+        $ddl[] = "  storage_default " . $mapVarchar(20) . " NOT NULL,";
+        $ddl[] = "  json_column " . $mapVarchar(191) . " NULL,";
+        $ddl[] = "  pk_type " . $mapVarchar(10) . " NOT NULL,";
+        $ddl[] = "  uuid_subtype " . $mapVarchar(20) . " NULL,";
+        $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  PRIMARY KEY (id)";
+        $ddl[] = ");";
+        $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_entities_name ON eav_entities (name);";
+        $ddl[] = "";
+
+        $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attribute_sets_eav_attributes (";
         $ddl[] = "  attribute_set_id {$idCol} NOT NULL,";
         $ddl[] = "  attribute_id {$idCol} NOT NULL,";
         $ddl[] = "  position INTEGER DEFAULT 0,";
         $ddl[] = "  PRIMARY KEY (attribute_set_id, attribute_id)";
         $ddl[] = ");";
-        $ddl[] = "ALTER TABLE attribute_set_attributes ADD CONSTRAINT fk_asa_set_id FOREIGN KEY (attribute_set_id) REFERENCES attribute_sets(id) ON DELETE CASCADE;";
-        $ddl[] = "ALTER TABLE attribute_set_attributes ADD CONSTRAINT fk_asa_attr_id FOREIGN KEY (attribute_id) REFERENCES attributes(id) ON DELETE CASCADE;";
+        $ddl[] = "ALTER TABLE eav_attribute_sets_eav_attributes ADD CONSTRAINT fk_asa_set_id FOREIGN KEY (attribute_set_id) REFERENCES eav_attribute_sets(id) ON DELETE CASCADE;";
+        $ddl[] = "ALTER TABLE eav_attribute_sets_eav_attributes ADD CONSTRAINT fk_asa_attr_id FOREIGN KEY (attribute_id) REFERENCES eav_attributes(id) ON DELETE CASCADE;";
         $ddl[] = "";
 
         // Determine which EAV tables to create
