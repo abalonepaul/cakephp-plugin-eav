@@ -55,7 +55,8 @@ class EavCreateAttributeCommandTest extends TestCase
 
     public function testCreateAttribute(): void
     {
-        $this->exec('eav create_attribute color:string -l "Color"');
+        // Pass explicit test connection to ensure writes land on the test datasource
+        $this->exec('eav create_attribute color:string -l "Color" --connection test');
         $this->assertExitSuccess();
         $this->assertOutputContains('Created attribute color (string)');
 
@@ -68,10 +69,10 @@ class EavCreateAttributeCommandTest extends TestCase
 
     public function testDuplicateAttributeNoop(): void
     {
-        $this->exec('eav create_attribute color:string -l "Color"');
+        $this->exec('eav create_attribute color:string -l "Color" --connection test');
         $this->assertExitSuccess();
 
-        $this->exec('eav create_attribute color:string -l "Color"');
+        $this->exec('eav create_attribute color:string -l "Color" --connection test');
         $this->assertExitSuccess();
         $this->assertOutputContains('Attribute already exists: color');
 

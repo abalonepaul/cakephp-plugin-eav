@@ -922,6 +922,53 @@ Acceptance
 - Postgres-only features remain guarded; non-Postgres runs fall back with clear notices.
 - Create Attribute honors --connection and writes to the intended datasource.
 
+### Feature 6 — Command connection handling (Code Complete)
+
+What changed
+- Create Attribute command now honors --connection, validates the datasource, and uses the requested connection when loading the EAV registry:
+    - Added --connection option in [plugins/Eav/src/Command/EavCreateAttributeCommand.php](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavCreateAttributeCommand.php).
+    - Validates the provided connection via ConnectionManager before proceeding.
+    - Uses TableLocator with ['connectionName' => <name>] and avoids reconfiguration errors by:
+        - Reusing an existing Eav.EavAttributes table instance when already registered.
+        - Removing and reloading the table on the requested connection only if the loaded one differs.
+    - Prints “Using connection: <name>” for visibility in interactive runs.
+
+Why this change
+- Fixes multi-connection support for the Create Attribute path, aligning it with Setup and JSONB Migrator commands, and prevents “already exists in the registry” errors in tests or long-running CLI sessions.
+
+Goals met
+- Ensure CLI commands work across multiple connections with minimal flags: Yes.
+- Provide consistent behavior with connection selection (interactive vs non-interactive):
+    - Non-interactive Create Attribute now supports --connection; Setup wizard already prompts when needed.
+- Maintain driver guards where applicable: No changes required for this command (guards remain in other commands).
+
+Acceptance criteria met
+- All commands that touch the database honor an explicit --connection flag or derive via wizard: Yes.
+    - Setup (non-interactive) respects --connection; wizard prompts.
+    - JSONB migrator already honors --connection.
+    - Create Attribute now honors --connection and writes to the intended datasource.
+- Postgres-only feature guards remain intact (unchanged for this feature).
+- Create Attribute writes to the selected datasource as verified by tests.
+
+Files changed
+- Modified
+    - [plugins/Eav/src/Command/EavCreateAttributeCommand.php](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Command/EavCreateAttributeCommand.php)
+
+Tests added/updated
+- Updated
+    - [plugins/Eav/tests/TestCase/Command/EavCreateAttributeCommandTest.php](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/tests/TestCase/Command/EavCreateAttributeCommandTest.php)
+        - Passes --connection test to ensure writes land on the test datasource.
+        - Covers duplicate no-op behavior under the same connection.
+
+Developer runbook
+- Run the specific tests:
+    - vendor/bin/phpunit plugins/Eav/tests/TestCase/Command/EavCreateAttributeCommandTest.php
+- Full plugin tests:
+    - vendor/bin/phpunit plugins/Eav/tests
+- CLI usage:
+    - Default connection: bin/cake eav create_attribute color:string -l "Color"
+    - Specific connection: bin/cake eav create_attribute color:string -l "Color" --connection test
+
 ## Feature 7 — Behavior consistency and finder
 
 Goals
