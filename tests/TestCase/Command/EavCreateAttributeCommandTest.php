@@ -31,9 +31,7 @@ class EavCreateAttributeCommandTest extends TestCase
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
-                ->addColumn('label', ['type' => 'string', 'length' => 255, 'null' => true])
                 ->addColumn('data_type', ['type' => 'string', 'length' => 50, 'null' => false])
-                ->addColumn('options', ['type' => 'json', 'null' => false])
                 ->addColumn('created', ['type' => 'datetime', 'null' => false])
                 ->addColumn('modified', ['type' => 'datetime', 'null' => false])
                 ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
@@ -56,23 +54,21 @@ class EavCreateAttributeCommandTest extends TestCase
     public function testCreateAttribute(): void
     {
         // Pass explicit test connection to ensure writes land on the test datasource
-        $this->exec('eav create_attribute color:string -l "Color" --connection test');
+        $this->exec('eav create_attribute color:string --connection test');
         $this->assertExitSuccess();
         $this->assertOutputContains('Created attribute color (string)');
 
         $Attributes = TableRegistry::getTableLocator()->get('Eav.EavAttributes');
         $attr = $Attributes->find()->where(['name' => 'color'])->firstOrFail();
         $this->assertSame('string', $attr->data_type);
-        $this->assertSame('Color', $attr->label);
-        $this->assertSame([], $attr->options);
     }
 
     public function testDuplicateAttributeNoop(): void
     {
-        $this->exec('eav create_attribute color:string -l "Color" --connection test');
+        $this->exec('eav create_attribute color:string --connection test');
         $this->assertExitSuccess();
 
-        $this->exec('eav create_attribute color:string -l "Color" --connection test');
+        $this->exec('eav create_attribute color:string --connection test');
         $this->assertExitSuccess();
         $this->assertOutputContains('Attribute already exists: color');
 

@@ -61,6 +61,10 @@ class EavAttributesTable extends Table
     public function validationDefault(Validator $validator): Validator
     {
         $validator
+            ->uuid('id')
+            ->allowEmptyString('id', null, 'create');
+
+        $validator
             ->scalar('name')
             ->maxLength('name', 191)
             ->requirePresence('name', 'create')
@@ -68,19 +72,10 @@ class EavAttributesTable extends Table
             ->add('name', 'unique', ['rule' => 'validateUnique', 'provider' => 'table']);
 
         $validator
-            ->scalar('label')
-            ->maxLength('label', 255)
-            ->allowEmptyString('label');
-
-        $validator
             ->scalar('data_type')
             ->maxLength('data_type', 50)
             ->requirePresence('data_type', 'create')
             ->notEmptyString('data_type');
-
-        $validator
-            ->requirePresence('options', 'create')
-            ->notEmptyString('options');
 
         return $validator;
     }
@@ -94,7 +89,8 @@ class EavAttributesTable extends Table
      */
     public function buildRules(RulesChecker $rules): RulesChecker
     {
-        $rules->add($rules->isUnique(['name']), ['errorField' => 'name']);
+        // Name must be unique
+        $rules->add($rules->isUnique(['name'], 'This name is already in use.'), ['errorField' => 'name']);
 
         return $rules;
     }

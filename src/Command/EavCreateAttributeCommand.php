@@ -8,7 +8,6 @@ use Cake\Console\Arguments;
 use Cake\Console\ConsoleIo;
 use Cake\Database\TypeFactory;
 use Cake\Datasource\ConnectionManager;
-use Cake\Utility\Inflector;
 
 class EavCreateAttributeCommand extends Command
 {
@@ -41,7 +40,7 @@ class EavCreateAttributeCommand extends Command
         $name = (string)($args->getArgument('name') ?? '');
         $type = (string)($args->getArgument('type') ?? 'string');
         if (!$name) {
-            $io->err('Usage: bin/cake eav create_attribute name:type [--label "Label"] [--connection <name>]');
+            $io->err('Usage: bin/cake eav create_attribute name:type [--connection <name>]');
             return Command::CODE_ERROR;
         }
         if (strpos($name, ':') !== false && !$args->getArgument('type')) {
@@ -58,13 +57,9 @@ class EavCreateAttributeCommand extends Command
         }
         $io->out('Using connection: ' . $connectionName);
 
-        $label = (string)($args->getOption('label') ?? '');
         $normalizedType = $this->normalizeType($type, $io);
         if ($normalizedType === null) {
             return Command::CODE_ERROR;
-        }
-        if ($label === '') {
-            $label = Inflector::humanize($name);
         }
 
         // Use the selected connection for the attributes registry; avoid reconfiguring an existing registry instance.
@@ -90,8 +85,6 @@ class EavCreateAttributeCommand extends Command
         $entity = $Attributes->newEntity([
             'name' => $name,
             'data_type' => $normalizedType,
-            'label' => $label,
-            'options' => [],
         ]);
         if ($Attributes->save($entity)) {
             $io->out('Created attribute ' . $name . ' (' . $normalizedType . ')');
@@ -133,7 +126,6 @@ class EavCreateAttributeCommand extends Command
     {
         $parser->addArgument('name', ['help' => 'Attribute name or name:type']);
         $parser->addArgument('type', ['help' => 'Attribute type', 'required' => false]);
-        $parser->addOption('label', ['short' => 'l', 'help' => 'Human label']);
         // Step 1: Add connection flag to align with other commands
         $parser->addOption('connection', ['help' => 'Datasource connection name', 'default' => 'default']);
         return $parser;

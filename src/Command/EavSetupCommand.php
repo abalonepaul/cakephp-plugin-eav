@@ -472,9 +472,7 @@ class {$className} extends AbstractMigration
             \$this->table('eav_attributes', ['id' => false, 'primary_key' => ['id']])
                 ->addColumn('id', '{$uuidType}', ['null' => false])
                 ->addColumn('name', 'string', ['limit' => 191, 'null' => false])
-                ->addColumn('label', 'string', ['limit' => 255, 'null' => true])
                 ->addColumn('data_type', 'string', ['limit' => 50, 'null' => false])
-                ->addColumn('options', 'json', ['null' => false])
                 ->addTimestamps('created', 'modified')
                 ->addIndex(['name'], ['unique' => true, 'name' => 'idx_eav_attributes_name'])
                 ->create();
@@ -690,9 +688,7 @@ PHP;
         $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attributes (";
         $ddl[] = "  id {$idCol} NOT NULL,";
         $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
-        $ddl[] = "  label " . $mapVarchar(255) . " NULL,";
         $ddl[] = "  data_type " . $mapVarchar(50) . " NOT NULL,";
-        $ddl[] = "  options JSON NOT NULL,";
         $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  PRIMARY KEY (id)";

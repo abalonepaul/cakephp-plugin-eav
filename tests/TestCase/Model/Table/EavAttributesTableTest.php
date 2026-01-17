@@ -76,9 +76,7 @@ class EavAttributesTableTest extends TestCase
         // Create an attribute not referenced by any set
         $new = $this->EavAttributes->newEntity([
             'name' => 'temp_attr_' . substr(sha1((string)microtime(true)), 0, 8),
-            'label' => 'Temp',
             'data_type' => 'string',
-            'options' => [],
         ]);
         $saved = $this->EavAttributes->saveOrFail($new);
 

@@ -19,14 +19,7 @@
                 <legend><?= __('Add Eav Attribute') ?></legend>
                 <?php
                     echo $this->Form->control('name');
-                    echo $this->Form->control('label');
                     echo $this->Form->control('data_type');
-                    echo $this->Form->control('options', [
-                        'type' => 'textarea',
-                        'rows' => 3,
-                        'value' => '{}',
-                        'help' => __('JSON metadata for this attribute (e.g., UI hints or validation rules). Leave "{}" if not used.'),
-                    ]);
                     echo $this->Form->control('eav_attribute_sets._ids', ['options' => $eavAttributeSets]);
                 ?>
             </fieldset>
