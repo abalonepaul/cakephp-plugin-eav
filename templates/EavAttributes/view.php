@@ -27,16 +27,8 @@
                     <td><?= h($eavAttribute->name) ?></td>
                 </tr>
                 <tr>
-                    <th><?= __('Label') ?></th>
-                    <td><?= h($eavAttribute->label) ?></td>
-                </tr>
-                <tr>
                     <th><?= __('Data Type') ?></th>
                     <td><?= h($eavAttribute->data_type) ?></td>
-                </tr>
-                <tr>
-                    <th><?= __('Options') ?></th>
-                    <td><?= h($eavAttribute->options) ?></td>
                 </tr>
                 <tr>
                     <th><?= __('Created') ?></th>

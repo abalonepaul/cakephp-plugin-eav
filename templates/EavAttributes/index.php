@@ -3,7 +3,6 @@
  * @var \App\View\AppView $this
  * @var iterable<\Cake\Datasource\EntityInterface> $eavAttributes
  */
-use Cake\ORM\TableRegistry;
 ?>
 <div class="eavAttributes index content">
     <?= $this->Html->link(__('New Eav Attribute'), ['action' => 'add'], ['class' => 'button float-right']) ?>
@@ -14,12 +13,10 @@ use Cake\ORM\TableRegistry;
             <tr>
                 <th><?= $this->Paginator->sort('id') ?></th>
                 <th><?= $this->Paginator->sort('name') ?></th>
-                <th><?= $this->Paginator->sort('label') ?></th>
                 <th><?= $this->Paginator->sort('data_type') ?></th>
-                <th><?= $this->Paginator->sort('options') ?></th>
                 <th><?= $this->Paginator->sort('created') ?></th>
                 <th><?= $this->Paginator->sort('modified') ?></th>
-                <th><?= $this->Paginator->sort('actions') ?></th>
+                <th><?= __('Actions') ?></th>
             </tr>
             </thead>
             <tbody>
@@ -27,9 +24,7 @@ use Cake\ORM\TableRegistry;
                 <tr>
                     <td><?= h($eavAttribute->id) ?></td>
                     <td><?= h($eavAttribute->name) ?></td>
-                    <td><?= h($eavAttribute->label) ?></td>
                     <td><?= h($eavAttribute->data_type) ?></td>
-                    <td><?= h($eavAttribute->options) ?></td>
                     <td><?= h($eavAttribute->created) ?></td>
                     <td><?= h($eavAttribute->modified) ?></td>
                     <td class="actions">

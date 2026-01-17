@@ -57,9 +57,7 @@ class EavBehaviorTest extends TestCase
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
-                ->addColumn('label', ['type' => 'string', 'length' => 255, 'null' => true])
                 ->addColumn('data_type', ['type' => 'string', 'length' => 50, 'null' => false])
-                ->addColumn('options', ['type' => 'json', 'null' => false])
                 ->addColumn('created', ['type' => 'datetime', 'null' => false])
                 ->addColumn('modified', ['type' => 'datetime', 'null' => false])
                 ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
