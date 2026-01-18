@@ -31,6 +31,14 @@
                     <td><?= h($eavAttribute->data_type) ?></td>
                 </tr>
                 <tr>
+                    <th><?= __('Placeholder') ?></th>
+                    <td><?= h($eavAttribute->placeholder) ?></td>
+                </tr>
+                <tr>
+                    <th><?= __('Help Text') ?></th>
+                    <td><?= h($eavAttribute->help_text) ?></td>
+                </tr>
+                <tr>
                     <th><?= __('Created') ?></th>
                     <td><?= h($eavAttribute->created) ?></td>
                 </tr>

@@ -77,6 +77,17 @@ class EavAttributesTable extends Table
             ->requirePresence('data_type', 'create')
             ->notEmptyString('data_type');
 
+        // Optional UI hints
+        $validator
+            ->scalar('placeholder')
+            ->maxLength('placeholder', 255)
+            ->allowEmptyString('placeholder');
+
+        $validator
+            ->scalar('help_text')
+            ->maxLength('help_text', 255)
+            ->allowEmptyString('help_text');
+
         return $validator;
     }
 
