@@ -1820,30 +1820,32 @@ Runbook (validation)
 - Run: vendor/bin/phpunit plugins/Eav/tests
 
 Feature Chat prompt (paste into the dedicated implementation chat)
-You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue we are working on is EAV-24 — Normalize behavior config keys to "attributes" (remove "map" and "attributeTypeMap"). You are in Ask Mode. We will start with a minimal plan, then I will put you in Edit Mode to implement. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: whenever possible, perform all non-overlapping edits to each file in a single SEARCH/REPLACE block; otherwise provide a full-file replacement.
-
-Context and constraints
-- Default storage is tables; do NOT surface any JSON Storage options in this issue.
-- We are replacing 'map' and 'attributeTypeMap' with a single 'attributes' key:
-    - Example (tables): 'attributes' => ['color' => ['type' => 'string', 'persist' => true]]
-    - Example (json_column): 'attributes' => ['year_start' => ['type' => 'integer']] (persist ignored)
-- This issue updates behavior config and tests only; no command or UI changes.
-
+You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue we are working on is EAV-24 — Create Attribute UX consistency (flags-only). You are in Ask Mode. We will start with a minimal plan, then I will put you in Edit Mode to implement. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: when editing a file, perform all non-overlapping changes in a single SEARCH/REPLACE block; otherwise provide a full-file replacement. Do not split multiple blocks for the same file.
+Scope
+Require flags only:
+--name  , --type   (both required)
+Keep --connection
+Remove name:type parsing and --label entirely.
+Do not surface any JSON Storage options.
 Files to modify
-- plugins/Eav/src/Model/Behavior/EavBehavior.php
-- Tests under plugins/Eav/tests/TestCase/Model/Behavior that configure the behavior (e.g., EavBehaviorTest, EavTablesStorageModeTest, EavJsonStorageModeTest)
-
-Plan (concise)
-1) Update EavBehavior default config: remove 'map' and 'attributeTypeMap'; add 'attributes' => [].
-2) Update beforeMarshal/afterSave (tables storage) to use 'attributes' (persist=true controls saving).
-3) Update beforeFind and JSON helpers to read type hints from 'attributes' instead of 'attributeTypeMap'; keep eavTypes per-query overrides.
-4) Update tests to pass 'attributes' config; remove references to 'map'/'attributeTypeMap'; verify persistence (tables) and typing (JSON).
-
+plugins/Eav/src/Command/EavCreateAttributeCommand.php
+plugins/Eav/tests/TestCase/Command/EavCreateAttributeCommandTest.php
+Plan
+Command:
+Remove colon parsing logic.
+Add required options --name and --type via buildOptionParser (mark required or validate in execute with a clear error).
+Update usage/help messaging.
+Keep normalizeType logic and --connection handling as-is.
+Tests:
+Update calls to:
+eav create_attribute --name color --type string --connection test
+Duplicate run should print “Attribute already exists: color”
+Add negative tests for missing --name or --type returning a usage error and non-zero exit.
 Acceptance
-- Behavior ignores 'map' and 'attributeTypeMap' and functions with 'attributes' only.
-- Tables storage: persist=true entries are saved on afterSave; others are not auto-saved.
-- JSON storage: type hints from 'attributes' drive correct typing for select/order/where.
-- All updated tests are green.
+Running without --name or --type returns a clear error and non-zero exit.
+With both flags, attribute is created with normalized type.
+Duplicate call is a no-op with the existing message.
+Tests green.
 
 3) Behavior config key normalization (map vs attributeTypeMap)
 - Problem
