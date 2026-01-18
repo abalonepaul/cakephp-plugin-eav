@@ -22,7 +22,7 @@ class EavSetupCommandTest extends TestCase
         $this->assertExitSuccess();
         $this->assertOutputContains('Dry run - migration not written.');
         $this->assertOutputContains('EAV Setup Migration');
-        $this->assertOutputContains('class EavSetup extends AbstractMigration');
+        $this->assertOutputContains('class EavSetup extends BaseMigration');
         $this->assertOutputContains("->table('eav_attributes'");
         $this->assertOutputContains("->table('eav_attribute_sets'");
         $this->assertOutputContains("->table('eav_entities'");
@@ -96,7 +96,7 @@ class EavSetupCommandTest extends TestCase
             $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attributes');
         } else {
             $this->assertOutputContains('EAV Setup Migration', 'Expected fallback to migrations on unsupported driver');
-            $this->assertOutputContains('class EavSetup extends AbstractMigration');
+            $this->assertOutputContains('class EavSetup extends BaseMigration');
         }
 
         @unlink($tmp);

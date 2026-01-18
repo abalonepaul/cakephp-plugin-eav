@@ -15,13 +15,13 @@ class RemoveFieldsFromEavAttributes extends BaseMigration
      */
     public function change(): void
     {
-        if (!$this->hasTable('eav_attributes')) {
+        if ($this->hasTable('eav_attributes')) {
 
             $table = $this->table('eav_attributes');
-            if (!$table->hasColumn('label')) {
+            if ($table->hasColumn('label')) {
                 $table->removeColumn('label');
             }
-            if (!$table->hasColumn('options')) {
+            if ($table->hasColumn('options')) {
                 $table->removeColumn('options');
             }
             $table->update();
