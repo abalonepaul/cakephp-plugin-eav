@@ -1240,6 +1240,11 @@ Process & governance
   - Target files to modify (paths)
   - Desired acceptance criteria and tests to add/update
   - Any special driver assumptions
+- Command option policy (JSON Storage)
+  - Default storage is tables (UUID). JSON Storage is optional.
+  - Unless a JIRA issue explicitly targets JSON Storage (e.g., Feature 3 or a JSON Storage–specific task), Feature Chats and code changes must NOT surface JSON Storage flags/options in commands, tests, or UI.
+  - Setup wizard: only show JSON Storage prompts when the user explicitly selects storage=json_column; otherwise, omit JSON Storage prompts and help text.
+  - Feature Chat prompts must reiterate this constraint when relevant.
 - After each feature completes, add a short “Conversation Summary” back into this PLAN (or docs/features/FEATURE-<key>.md) with:
   - What changed (files, schema)
   - Commands run
@@ -1719,6 +1724,65 @@ Constraints
 - Keep scope limited to placeholder/help_text; do not reintroduce label/options; do not change CLI argument style here.
 
 ---
+
+JIRA: EAV-23 — Ensure CakePHP 5.x migrations extend BaseMigration (audit + generator fix)
+
+Scope (tight, testable)
+- Audit all plugin migrations and ensure classes extend Migrations\BaseMigration (not AbstractMigration).
+- Update any existing committed migration files in this plugin that still extend AbstractMigration.
+- Update the setup generator to always emit BaseMigration in generated migration payloads.
+
+Changes required
+- Migration files (repo audit)
+    - plugins/Eav/config/Migrations/*.php: all classes must use:
+        - use Migrations\BaseMigration;
+        - class <Name> extends BaseMigration
+- Generator
+    - plugins/Eav/src/Command/EavSetupCommand.php:
+        - buildMigration output must import Migrations\BaseMigration and extend BaseMigration.
+    - Raw SQL generation is unaffected (no PHP class).
+- Tests
+    - No functional changes expected; run the suite to guard regressions.
+
+Acceptance
+- grep for “extends AbstractMigration” returns no hits in the plugin.
+- EavSetupCommand dry-run outputs a migration that:
+    - Imports Migrations\BaseMigration
+    - Extends BaseMigration
+- All plugin tests green.
+
+Runbook (validation)
+- Search and verify:
+    - git grep -n "extends AbstractMigration" plugins/Eav || echo "OK: none"
+- Dry-run generator:
+    - bin/cake eav setup --dry-run --connection test --pk-type uuid --uuid-type nativeuuid --json-storage json --types defaults
+    - Confirm the emitted class uses BaseMigration (not AbstractMigration).
+- Run tests:
+    - vendor/bin/phpunit plugins/Eav/tests
+
+Feature Chat prompt (paste into the dedicated implementation chat)
+You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue is EAV-23 — Ensure CakePHP 5.x migrations extend BaseMigration (audit + generator fix). You are in Ask Mode. We will make a minimal plan, then switch to Edit Mode. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: whenever possible, perform all non-overlapping edits to each file in a single SEARCH/REPLACE block; otherwise provide a full-file replacement.
+
+Tasks
+1) Update any plugin migration classes under plugins/Eav/config/Migrations that extend AbstractMigration to extend Migrations\BaseMigration:
+    - Add “use Migrations\BaseMigration;”
+    - Change “extends AbstractMigration” to “extends BaseMigration”
+    - Remove any “use Migrations\AbstractMigration;”
+2) Update plugins/Eav/src/Command/EavSetupCommand.php so buildMigration emits:
+    - “use Migrations\BaseMigration;” and “class <Name> extends BaseMigration”
+3) Run grep to confirm no AbstractMigration remains and run the test suite.
+
+Constraints
+- Only touch plugin files; no app-level migrations.
+- Do not surface JSON Storage options or prompts; tables storage is the default.
+
+Acceptance
+- No “extends AbstractMigration” remains.
+- Generator emits BaseMigration classes.
+- Tests green.
+
+---
+
 
 2) Create Attribute UX consistency
 - Problem

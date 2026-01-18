@@ -25,6 +25,8 @@
                 <?php
                     echo $this->Form->control('name');
                     echo $this->Form->control('data_type');
+                    echo $this->Form->control('placeholder');
+                    echo $this->Form->control('help_text');
                     echo $this->Form->control('eav_attribute_sets._ids', ['options' => $eavAttributeSets]);
                 ?>
             </fieldset>

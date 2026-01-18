@@ -32,6 +32,8 @@ class EavCreateAttributeCommandTest extends TestCase
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
                 ->addColumn('data_type', ['type' => 'string', 'length' => 50, 'null' => false])
+                ->addColumn('placeholder', ['type' => 'string', 'length' => 255, 'null' => true])
+                ->addColumn('help_text', ['type' => 'string', 'length' => 255, 'null' => true])
                 ->addColumn('created', ['type' => 'datetime', 'null' => false])
                 ->addColumn('modified', ['type' => 'datetime', 'null' => false])
                 ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);

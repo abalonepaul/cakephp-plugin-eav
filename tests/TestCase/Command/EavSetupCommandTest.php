@@ -27,6 +27,8 @@ class EavSetupCommandTest extends TestCase
         $this->assertOutputContains("->table('eav_attribute_sets'");
         $this->assertOutputContains("->table('eav_entities'");
         $this->assertOutputContains("->addTimestamps('created', 'modified')");
+        $this->assertOutputContains("->addColumn('placeholder'");
+        $this->assertOutputContains("->addColumn('help_text'");
     }
 
     public function testRawSqlDryRunOnSupportedDrivers(): void
@@ -47,6 +49,9 @@ class EavSetupCommandTest extends TestCase
         $this->assertOutputContains('Dry run - SQL not written.');
         $this->assertOutputContains('EAV Setup SQL');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attributes');
+                $this->assertOutputContains('placeholder');
+        $this->assertOutputContains('help_text');
+
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attribute_sets');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_entities');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attribute_sets_eav_attributes');
