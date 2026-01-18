@@ -31,20 +31,28 @@ class EavCreateAttributeCommand extends Command
     /**
      * Create an attribute.
      *
+     * Flags-only UX:
+     *   bin/cake eav create_attribute --name <name> --type <type> [--connection <name>]
+     *
      * @param \Cake\Console\Arguments $args Arguments.
      * @param \Cake\Console\ConsoleIo $io Console io.
      * @return int
      */
     public function execute(Arguments $args, ConsoleIo $io): int
     {
-        $name = (string)($args->getArgument('name') ?? '');
-        $type = (string)($args->getArgument('type') ?? 'string');
-        if (!$name) {
-            $io->err('Usage: bin/cake eav create_attribute name:type [--connection <name>]');
+        // Enforce flags-only input
+        $name = (string)($args->getOption('name') ?? '');
+        $type = (string)($args->getOption('type') ?? '');
+
+        if ($name === '') {
+            $io->err('Missing required option: --name');
+            $io->err('Usage: bin/cake eav create_attribute --name <name> --type <type> [--connection <name>]');
             return Command::CODE_ERROR;
         }
-        if (strpos($name, ':') !== false && !$args->getArgument('type')) {
-            [$name, $type] = explode(':', $name, 2);
+        if ($type === '') {
+            $io->err('Missing required option: --type');
+            $io->err('Usage: bin/cake eav create_attribute --name <name> --type <type> [--connection <name>]');
+            return Command::CODE_ERROR;
         }
 
         // Resolve and validate connection
@@ -124,10 +132,23 @@ class EavCreateAttributeCommand extends Command
 
     public function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
     {
-        $parser->addArgument('name', ['help' => 'Attribute name or name:type']);
-        $parser->addArgument('type', ['help' => 'Attribute type', 'required' => false]);
-        // Step 1: Add connection flag to align with other commands
-        $parser->addOption('connection', ['help' => 'Datasource connection name', 'default' => 'default']);
+        // Flags-only parser (no positional arguments)
+        $parser
+            ->setDescription('Create an EAV attribute in the eav_attributes registry.')
+            ->addOption('name', [
+                'help' => 'Attribute name (e.g., color)',
+                'short' => 'n',
+            ])
+            ->addOption('type', [
+                'help' => 'Attribute type (e.g., string, integer, json, fk)',
+                'short' => 't',
+            ])
+            ->addOption('connection', [
+                'help' => 'Datasource connection name',
+                'default' => 'default',
+            ])
+            ->setEpilog('Example: bin/cake eav create_attribute --name color --type string --connection test');
+
         return $parser;
     }
 }
