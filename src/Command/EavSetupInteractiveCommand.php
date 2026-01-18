@@ -422,9 +422,9 @@ class EavSetupInteractiveCommand extends Command
                 $migBody[] = "<?php";
                 $migBody[] = "declare(strict_types=1);";
                 $migBody[] = "";
-                $migBody[] = "use Migrations\\AbstractMigration;";
+                $migBody[] = "use Migrations\\BaseMigration;";
                 $migBody[] = "";
-                $migBody[] = "class {$jsonMigClass} extends AbstractMigration";
+                $migBody[] = "class {$jsonMigClass} extends BaseMigration";
                 $migBody[] = "{";
                 $migBody[] = "    public function change(): void";
                 $migBody[] = "    {";
