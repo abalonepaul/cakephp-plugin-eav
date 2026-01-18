@@ -1783,18 +1783,67 @@ Acceptance
 
 ---
 
+JIRA: EAV-24 — Normalize behavior config keys to "attributes" (remove "map" and "attributeTypeMap")
 
-2) Create Attribute UX consistency
-- Problem
-  - name:type syntax is inconsistent; --label is unnecessary if UI humanizes; mixed conventions increase mistakes.
-  - Paul: Following CakePHP conventions and best practices is critical and absolutely required!
-- Decision proposal
-  - Make flags the only path: --name and --type (required). Remove name:type parsing and --label support.
-  - Paul: We don't need --label support as we are removing the label.
-- Next steps
-  - Update EavCreateAttributeCommand: flags only; remove colon parsing; remove label writes; update tests and help text.
-- JIRA
-  - EAV-Cmd-01: CLI UX – enforce --name and --type; remove name:type and --label; update tests and docs.
+Scope (small, independent, testable)
+- Replace dual keys with a single canonical config key on the behavior:
+    - attributes: array keyed by attribute/field name
+        - Example (tables storage): 'attributes' => ['color' => ['type' => 'string', 'persist' => true]]
+        - Example (JSON storage): 'attributes' => ['year_start' => ['type' => 'integer']] (persist ignored in json_column mode)
+- Remove support for 'map' and 'attributeTypeMap' to eliminate ambiguity (no back-compat required in this project).
+- Keep storage default = tables; do not surface JSON Storage options in this issue.
+
+Changes required
+- Behavior (plugins/Eav/src/Model/Behavior/EavBehavior.php)
+    - Default config: drop 'map' and 'attributeTypeMap'; add 'attributes' => [].
+    - beforeMarshal/afterSave (tables storage): read 'attributes' and persist only entries with ['persist' => true] (or default true if you prefer). JSON storage ignores persist.
+    - beforeFind: use 'attributes' for type hints and projections across both storage modes; add per-query overrides via eavTypes as today.
+    - Update internal helpers to source typing hints from 'attributes' only.
+- Tests
+    - Update behavior tests to provide 'attributes' config and remove references to 'map'/'attributeTypeMap'.
+    - Verify persistence via afterSave in tables mode when persist=true.
+    - Verify type hinting in JSON storage via 'attributes' config.
+- Docs
+    - Update examples in README/PLAN to use 'attributes' exclusively.
+
+Acceptance
+- Behavior works with 'attributes' only; 'map' and 'attributeTypeMap' are no longer recognized.
+- Tables storage: values defined with persist=true are saved on afterSave; others are not persisted automatically.
+- JSON storage: type hints provided via 'attributes' are used for projections/where/order and hydration; no persistence behavior changes.
+- All updated tests pass; no JSON Storage options are surfaced in commands/UI by this issue.
+
+Runbook (validation)
+- Update a behavior attach in tests to:
+    - 'attributes' => ['color' => ['type' => 'string', 'persist' => true], 'year_start' => ['type' => 'integer']]
+- In tables mode: save an entity with color and ensure eav_string row is created (persist=true).
+- In JSON storage mode: ensure queries orderByAsc('year_start') and where(['year_start >=' => 2010]) behave correctly with types inferred from attributes config.
+- Run: vendor/bin/phpunit plugins/Eav/tests
+
+Feature Chat prompt (paste into the dedicated implementation chat)
+You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue we are working on is EAV-24 — Normalize behavior config keys to "attributes" (remove "map" and "attributeTypeMap"). You are in Ask Mode. We will start with a minimal plan, then I will put you in Edit Mode to implement. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: whenever possible, perform all non-overlapping edits to each file in a single SEARCH/REPLACE block; otherwise provide a full-file replacement.
+
+Context and constraints
+- Default storage is tables; do NOT surface any JSON Storage options in this issue.
+- We are replacing 'map' and 'attributeTypeMap' with a single 'attributes' key:
+    - Example (tables): 'attributes' => ['color' => ['type' => 'string', 'persist' => true]]
+    - Example (json_column): 'attributes' => ['year_start' => ['type' => 'integer']] (persist ignored)
+- This issue updates behavior config and tests only; no command or UI changes.
+
+Files to modify
+- plugins/Eav/src/Model/Behavior/EavBehavior.php
+- Tests under plugins/Eav/tests/TestCase/Model/Behavior that configure the behavior (e.g., EavBehaviorTest, EavTablesStorageModeTest, EavJsonStorageModeTest)
+
+Plan (concise)
+1) Update EavBehavior default config: remove 'map' and 'attributeTypeMap'; add 'attributes' => [].
+2) Update beforeMarshal/afterSave (tables storage) to use 'attributes' (persist=true controls saving).
+3) Update beforeFind and JSON helpers to read type hints from 'attributes' instead of 'attributeTypeMap'; keep eavTypes per-query overrides.
+4) Update tests to pass 'attributes' config; remove references to 'map'/'attributeTypeMap'; verify persistence (tables) and typing (JSON).
+
+Acceptance
+- Behavior ignores 'map' and 'attributeTypeMap' and functions with 'attributes' only.
+- Tables storage: persist=true entries are saved on afterSave; others are not auto-saved.
+- JSON storage: type hints from 'attributes' drive correct typing for select/order/where.
+- All updated tests are green.
 
 3) Behavior config key normalization (map vs attributeTypeMap)
 - Problem
