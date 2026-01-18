@@ -56,7 +56,7 @@ class EavCreateAttributeCommandTest extends TestCase
     public function testCreateAttribute(): void
     {
         // Pass explicit test connection to ensure writes land on the test datasource
-        $this->exec('eav create_attribute color:string --connection test');
+        $this->exec('eav create_attribute --name color --type string --connection test');
         $this->assertExitSuccess();
         $this->assertOutputContains('Created attribute color (string)');
 
@@ -67,15 +67,29 @@ class EavCreateAttributeCommandTest extends TestCase
 
     public function testDuplicateAttributeNoop(): void
     {
-        $this->exec('eav create_attribute color:string --connection test');
+        $this->exec('eav create_attribute --name color --type string --connection test');
         $this->assertExitSuccess();
 
-        $this->exec('eav create_attribute color:string --connection test');
+        $this->exec('eav create_attribute --name color --type string --connection test');
         $this->assertExitSuccess();
         $this->assertOutputContains('Attribute already exists: color');
 
         $Attributes = TableRegistry::getTableLocator()->get('Eav.EavAttributes');
         $count = $Attributes->find()->where(['name' => 'color'])->count();
         $this->assertSame(1, $count);
+    }
+
+    public function testMissingNameShowsError(): void
+    {
+        $this->exec('eav create_attribute --type string --connection test');
+        $this->assertExitError();
+        $this->assertErrorContains('Missing required option: --name');
+    }
+
+    public function testMissingTypeShowsError(): void
+    {
+        $this->exec('eav create_attribute --name color --connection test');
+        $this->assertExitError();
+        $this->assertErrorContains('Missing required option: --type');
     }
 }
