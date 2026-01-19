@@ -1835,7 +1835,6 @@ class EavBehavior extends Behavior
             $entity = $Attributes->newEntity([
                 'name' => $name,
                 'data_type' => $type,
-                'options' => [],
             ]);
             $Attributes->saveOrFail($entity);
             $id = (string)$entity->id;
