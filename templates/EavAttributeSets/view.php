@@ -43,9 +43,7 @@
                         <tr>
                             <th><?= __('Id') ?></th>
                             <th><?= __('Name') ?></th>
-                            <th><?= __('Label') ?></th>
                             <th><?= __('Data Type') ?></th>
-                            <th><?= __('Options') ?></th>
                             <th><?= __('Created') ?></th>
                             <th><?= __('Modified') ?></th>
                             <th class="actions"><?= __('Actions') ?></th>
@@ -54,9 +52,7 @@
                         <tr>
                             <td><?= h($eavAttribute->id) ?></td>
                             <td><?= h($eavAttribute->name) ?></td>
-                            <td><?= h($eavAttribute->label) ?></td>
                             <td><?= h($eavAttribute->data_type) ?></td>
-                            <td><?= h($eavAttribute->options) ?></td>
                             <td><?= h($eavAttribute->created) ?></td>
                             <td><?= h($eavAttribute->modified) ?></td>
                             <td class="actions">

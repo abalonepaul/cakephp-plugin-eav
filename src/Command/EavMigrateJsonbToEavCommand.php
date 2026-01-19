@@ -89,7 +89,6 @@ class EavMigrateJsonbToEavCommand extends Command
             $attr = $Attributes->newEntity([
                 'name' => $attribute,
                 'data_type' => $normalizedType,
-                'options' => [],
             ]);
             $Attributes->saveOrFail($attr);
         }

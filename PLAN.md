@@ -1846,6 +1846,79 @@ Running without --name or --type returns a clear error and non-zero exit.
 With both flags, attribute is created with normalized type.
 Duplicate call is a no-op with the existing message.
 Tests green.
+ ---
+
+JIRA: EAV-25 — Remove residual label/options usage (code and templates)
+
+Scope (small, independent, testable)
+- Eliminate all remaining references to the removed label/options fields in code, templates, and tests.
+- Remove any accidentally committed generated setup migration that still defines label/options.
+
+Changes required
+- Commands/Behavior:
+    - plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php
+        - Attribute creation path: remove 'options' from newEntity([...]).
+    - plugins/Eav/src/Model/Behavior/EavBehavior.php
+        - attributeId(): remove 'options' from newEntity([...]).
+- UI:
+    - plugins/Eav/templates/EavAttributeSets/view.php
+        - Drop the “Label” and “Options” columns and corresponding cells from the “Related Eav Attributes” table.
+- Entity metadata:
+    - plugins/Eav/src/Model/Entity/EavAttribute.php
+        - Update PHPDoc and $_accessible to reflect current columns (name, data_type, placeholder, help_text, created, modified). Remove label/options entries.
+- Migrations (cleanup):
+    - Remove any committed generated setup migration that still creates label/options (e.g., plugins/Eav/config/Migrations/20251228222358_eav_setup.php) from VCS.
+- Tests:
+    - plugins/Eav/tests/TestCase/Command/EavMigrateJsonbToEavCommandTest.php::setUpBeforeClass
+        - Ensure the bootstrap schema for eav_attributes does NOT add label/options (use placeholder/help_text or rely on EavAttributesFixture).
+    - Grep the test suite for label/options references and update/remove as needed.
+
+Acceptance
+- No code path sets eav_attributes.options or reads label/options.
+- Attribute Sets “view” renders without Label/Options columns.
+- EavAttribute entity metadata reflects placeholder/help_text (no label/options).
+- No generated setup migration with label/options remains tracked in VCS.
+- All tests pass.
+
+Runbook (validation)
+- Grep for residuals:
+    - git grep -nE "\blabel\b|\boptions\b" plugins/Eav | grep -v help_text | grep -v placeholder
+- Remove accidental setup migration (if still tracked):
+    - git rm --cached plugins/Eav/config/Migrations/20251228222358_eav_setup.php
+- Run tests:
+    - vendor/bin/phpunit plugins/Eav/tests
+
+Feature Chat prompt (paste into the dedicated implementation chat)
+You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue we are working on is EAV-25 — Remove residual label/options usage (code and templates). You are in Ask Mode. We will start with a minimal plan, then I will put you in Edit Mode to implement. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: when editing a file, perform all non-overlapping changes in a single SEARCH/REPLACE block; otherwise provide a full-file replacement. Do not split multiple blocks for the same file.
+
+Scope
+- Remove label/options from attribute creation code paths:
+    - plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php: newEntity([...]) must not include 'options'.
+    - plugins/Eav/src/Model/Behavior/EavBehavior.php: attributeId() newEntity([...]) must not include 'options'.
+- Update the Attribute Sets view to drop label/options columns:
+    - plugins/Eav/templates/EavAttributeSets/view.php: remove Label/Options headers and cells in the related attributes table.
+- Align the EavAttribute entity metadata:
+    - plugins/Eav/src/Model/Entity/EavAttribute.php: update PHPDoc and $_accessible to reflect (name, data_type, placeholder, help_text, created, modified); remove label/options.
+- Fix any test bootstrap still modeling old schema:
+    - plugins/Eav/tests/TestCase/Command/EavMigrateJsonbToEavCommandTest.php::setUpBeforeClass: remove label/options bootstrap; rely on fixture or use placeholder/help_text.
+- Do not add JSON Storage options; default storage is tables.
+
+Plan
+1) Edit EavMigrateJsonbToEavCommand: remove 'options' from attributes creation payload.
+2) Edit EavBehavior#attributeId: remove 'options' from attributes creation payload.
+3) Edit templates/EavAttributeSets/view.php: delete Label/Options columns and cells.
+4) Edit Model/Entity/EavAttribute.php: update PHPDoc and $_accessible to placeholder/help_text; remove label/options.
+5) Edit EavMigrateJsonbToEavCommandTest::setUpBeforeClass: update eav_attributes schema bootstrap to current shape or rely on EavAttributesFixture only.
+6) Remove any generated setup migration with label/options from VCS (git rm --cached).
+7) Run tests.
+
+Acceptance
+- No creation code references 'options'.
+- Attribute Sets view has no Label/Options columns.
+- EavAttribute entity metadata matches schema (placeholder/help_text; no label/options).
+- Tests pass.
+
+---
 
 3) Behavior config key normalization (map vs attributeTypeMap)
 - Problem
