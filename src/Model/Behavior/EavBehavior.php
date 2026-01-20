@@ -39,14 +39,13 @@ class EavBehavior extends Behavior
         'entityTable'       => null,   // e.g. 'items'
         'pkType'            => 'uuid', // 'uuid'|'int' (affects column type only)
         'attributeSet'      => null,
-        'map'               => [],     // 'field' => ['attribute'=>'name','type'=>'decimal']
+        'attributes'        => [],     // 'field' => ['attribute' => 'name', 'type' => 'decimal', 'persist' => true] (persist ignored in json_column)
         'events'            => ['beforeMarshal'=>true,'afterSave'=>true,'afterFind'=>true],
         'jsonStorage'       => 'json', // json|jsonb (for JSON Attribute table eav_json)
         'jsonEncodeOnWrite' => false,  // default false per PLAN; ignored in JSON Storage Mode
         // JSON Storage Mode (entity-level JSONB bundle):
         'storage'           => 'tables', // 'tables' (default) | 'json_column'
         'jsonColumn'        => null,     // e.g., 'attrs' or 'spec' when storage=json_column
-        'attributeTypeMap'  => [],       // ['attrName' => 'type'] optional typing hints for JSON Storage
     ];
 
     /** @var array<string,mixed> */
@@ -97,7 +96,7 @@ class EavBehavior extends Behavior
         if (!$this->getConfig('events')['beforeMarshal']) {
             return;
         }
-        $map = (array)$this->getConfig('map');
+        $map = (array)$this->getConfig('attributes');
         foreach ($map as $field => $meta) {
             if ($data->offsetExists($field)) {
                 $this->buffer['write'][$field] = $data[$field];
@@ -122,34 +121,19 @@ class EavBehavior extends Behavior
         if (!$entity->get('id')) {
             return;
         }
-        $map = (array)$this->getConfig('map');
+        $map = (array)$this->getConfig('attributes');
         $entityId = $entity->get('id');
 
-        // JSON Storage Mode: batch update JSON column via jsonb_set for changed keys
+        // JSON Storage Mode: batch update JSON column via jsonb_set for changed keys (persist ignored in json_column mode)
         if ($this->isJsonColumnMode()) {
-            // Determine which fields to persist:
-            // - Prefer explicit map if provided.
-            // - Otherwise, derive from attributeTypeMap (field name == attribute name).
             $kv = [];
-            if ($map) {
-                foreach ($map as $field => $meta) {
-                    $attribute = (string)($meta['attribute'] ?? $field);
-                    $val = $this->buffer['write'][$field] ?? $entity->get($field);
-                    if ($val === null && !$entity->isDirty($field)) {
-                        continue;
-                    }
-                    $kv[$attribute] = $val;
+            foreach ($map as $field => $meta) {
+                $attribute = (string)($meta['attribute'] ?? $field);
+                $val = $this->buffer['write'][$field] ?? $entity->get($field);
+                if ($val === null && !$entity->isDirty($field)) {
+                    continue;
                 }
-            } else {
-                $typeMap = (array)$this->getConfig('attributeTypeMap');
-                foreach (array_keys($typeMap) as $field) {
-                    $val = $entity->get($field);
-                    if ($val === null && !$entity->isDirty($field)) {
-                        continue;
-                    }
-                    // When dirty with null, we remove the key; when non-dirty null, skip.
-                    $kv[$field] = $val;
-                }
+                $kv[$attribute] = $val;
             }
 
             if ($kv !== []) {
@@ -187,8 +171,12 @@ class EavBehavior extends Behavior
             return;
         }
 
-        // Default table-backed EAV writes
+        // Default table-backed EAV writes (persist=true only; default true)
         foreach ($map as $field => $meta) {
+            $shouldPersist = array_key_exists('persist', (array)$meta) ? (bool)$meta['persist'] : true;
+            if ($shouldPersist !== true) {
+                continue;
+            }
             $attribute = $meta['attribute'] ?? $field;
             $type = $meta['type'] ?? 'string';
             $val = $this->buffer['write'][$field] ?? $entity->get($field);
@@ -236,7 +224,12 @@ class EavBehavior extends Behavior
         // JSON Storage Mode path (existing behavior)
         if ($this->isJsonColumnMode()) {
             // Merge behavior-configured types with per-query overrides (eavTypes)
-            $configuredTypes = (array)$this->getConfig('attributeTypeMap');
+            $configuredTypes = [];
+            foreach ((array)$this->getConfig('attributes') as $name => $meta) {
+                if (isset($meta['type']) && is_string($meta['type'])) {
+                    $configuredTypes[(string)$name] = (string)$meta['type'];
+                }
+            }
             $overrideTypes = (array)($opts['eavTypes'] ?? []);
             $typeMap = $overrideTypes + $configuredTypes; // overrides take precedence
 
@@ -244,7 +237,7 @@ class EavBehavior extends Behavior
             // A single rewrite pass is applied later after flat-array options handling.
 
             // For projections, we build from:
-            // - attributeTypeMap + eavTypes, and
+            // - attributes (types) + eavTypes, and
             // - attributes explicitly named in select([...]) that are not native columns.
             $projectAttrs = [];
             foreach ($typeMap as $attr => $type) {
@@ -256,7 +249,7 @@ class EavBehavior extends Behavior
             }
 
             // Augment projections with attribute names present in the select clause.
-            // If users do ->select(['id','color']), project 'color' even if not in attributeTypeMap/eavTypes.
+            // If users do ->select(['id','color']), project 'color' even if not in attributes/eavTypes.
             $selectClause = (array)$query->clause('select');
             foreach ($selectClause as $k => $v) {
                 // Two common forms:
@@ -431,7 +424,7 @@ class EavBehavior extends Behavior
 
         // Tables Storage Mode path
         $overrideTypes = (array)($opts['eavTypes'] ?? []);
-        $map = (array)$this->getConfig('map');
+        $map = (array)$this->getConfig('attributes');
 
         $selectTypes = [];
         $projected = [];
@@ -804,7 +797,7 @@ class EavBehavior extends Behavior
         if ($existingWhere instanceof \Cake\Database\ExpressionInterface) {
             // Resolve per-query override types and configured attribute map
             $overrideTypes = (array)($opts['eavTypes'] ?? []);
-            $map = (array)($this->getConfig('attributeTypeMap') ?? []);
+            $map = (array)$this->getConfig('attributes');
 
             // Root context for joins
             $rootAlias = $table->getAlias();
@@ -1677,7 +1670,7 @@ class EavBehavior extends Behavior
      * Hydrate EAV values into entities after find.
      *
      * - Default (tables mode): batch load from eav_* and merge.
-     * - JSON Storage Mode: ensure typed hydration for projected attributes using attributeTypeMap.
+     * - JSON Storage Mode: ensure typed hydration for projected attributes using attributes type hints.
      *
      * @param \Cake\Event\EventInterface $event Event.
      * @param \Cake\ORM\Query $query Query.
@@ -1693,7 +1686,12 @@ class EavBehavior extends Behavior
 
         // JSON Storage Mode: only cast projected attributes; no eav_* tables involved.
         if ($this->isJsonColumnMode()) {
-            $typeMap = (array)$this->getConfig('attributeTypeMap');
+            $typeMap = [];
+            foreach ((array)$this->getConfig('attributes') as $name => $meta) {
+                if (isset($meta['type']) && is_string($meta['type'])) {
+                    $typeMap[(string)$name] = (string)$meta['type'];
+                }
+            }
             if ($typeMap === []) {
                 return;
             }
@@ -1776,7 +1774,7 @@ class EavBehavior extends Behavior
         }
 
         // Default tables-backed path (existing behavior)
-        $map = (array)$this->getConfig('map');
+        $map = (array)$this->getConfig('attributes');
         if (!$map) {
             return;
         }

@@ -79,11 +79,11 @@ class EavJsonStorageModeTest extends TestCase
         $this->Items->addBehavior('Eav.Eav', [
             'storage' => 'json_column',
             'jsonColumn' => 'attrs',
-            'attributeTypeMap' => [
-                'color' => 'string',
-                'year_start' => 'integer',
-                'is_active' => 'boolean',
-                'manufactured_at' => 'date',
+            'attributes' => [
+                'color' => ['type' => 'string'],
+                'year_start' => ['type' => 'integer'],
+                'is_active' => ['type' => 'boolean'],
+                'manufactured_at' => ['type' => 'date'],
             ],
         ]);
 
@@ -96,10 +96,10 @@ class EavJsonStorageModeTest extends TestCase
         $this->Products->addBehavior('Eav.Eav', [
             'storage' => 'json_column',
             'jsonColumn' => 'spec',
-            'attributeTypeMap' => [
-                'color' => 'string',
-                'weight' => 'float',
-                'is_active' => 'boolean',
+            'attributes' => [
+                'color' => ['type' => 'string'],
+                'weight' => ['type' => 'float'],
+                'is_active' => ['type' => 'boolean'],
             ],
         ]);
     }

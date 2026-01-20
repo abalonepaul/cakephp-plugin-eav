@@ -100,4 +100,40 @@ class EavTablesStorageModeTest extends TestCase
         $this->assertSame('22222222-2222-2222-2222-222222222222', $rows[0]->id); // red
         $this->assertSame('33333333-3333-3333-3333-333333333333', $rows[1]->id); // null
     }
+
+    public function testAfterSavePersistsConfiguredAttributes(): void
+    {
+        // Reattach behavior with attributes config (persist=true by default)
+        $this->Entities->removeBehavior('Eav');
+        $this->Entities->addBehavior('Eav.Eav', [
+            'entityTable' => 'test_entities',
+            'pkType' => 'uuid',
+            'storage' => 'tables',
+            'attributes' => [
+                'color' => ['type' => 'string', 'persist' => true],
+            ],
+        ]);
+
+        // Create a new entity and set an attribute configured to persist
+        $newId = '44444444-4444-4444-4444-444444444444';
+        $entity = $this->Entities->newEntity(['id' => $newId]);
+        $entity->set('color', 'blue');
+        $this->Entities->saveOrFail($entity);
+
+        // Verify a row exists in eav_string for this entity/attribute
+        $Attributes = TableRegistry::getTableLocator()->get('Eav.EavAttributes');
+        $colorAttr = $Attributes->find()->select(['id'])->where(['name' => 'color'])->enableHydration(false)->firstOrFail();
+
+        $EavString = TableRegistry::getTableLocator()->get('Eav.EavString');
+        $row = $EavString->find()
+            ->where([
+                'entity_table' => 'test_entities',
+                'entity_id' => $newId,
+                'attribute_id' => $colorAttr['id'],
+            ])
+            ->first();
+
+        $this->assertNotNull($row, 'Expected persisted EAV value for "color"');
+        $this->assertSame('blue', $row->get('value'));
+    }
 }
