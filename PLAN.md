@@ -31,7 +31,7 @@ Formatting Guidelines
 - Add a short mirror in Instructions:
 - “Follow the Formatting Guidelines; they are mandatory.”
 
-## Feature 1 — Cleanup/Hardening (Done)
+## Feature 1/EAV-11 — Cleanup/Hardening (Done)
 What’s drifting
 - Value tables and classes currently use Av* and pk suffixes (e.g., av_string_uuid/av_string_int) and class resolution uses pk suffixes: see [EavBehavior#avTableClass](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#avTableClass) and [EavBehavior#pkSuffix](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#pkSuffix).
 - JSONB naming drift in class/name composition (Json vs Jsonb): [EavBehavior#tableTypeSegment](file:///home/paul/dev/cakephp/protech_parts/plugins/Eav/src/Model/Behavior/EavBehavior.php#tableTypeSegment).
@@ -126,7 +126,7 @@ Confirmation against acceptance
   Attributes/AttributeSets tables remain unprefixed and the join table remains attribute_set_attributes by design; prefixing is scheduled in Feature 5 (see plugins/Eav/PLAN.md).
   Configuration persistence to plugins/Eav/config/eav.json and interactive setup are planned for Feature 4; not required in Feature 1."
 
-## Feature 2 — Data Type Support
+## Feature 2/EAV-12 — Data Type Support (Done)
 Goals
 - Support all CakePHP TypeFactory types + custom ‘fk’.
 - Default set most apps need; advanced types are opt-in via interactive Setup.
@@ -228,7 +228,7 @@ Summary and Confirmation
     - Schema/config changes:
       - Canonical eav_* schema; addTimestamps in generator; one eav_fk.
 
-## Feature 3 — JSON
+## Feature 3/EAV-13 — JSON Storage Mode (Done)
   - Scope
     - Postgres-only for this feature.
     - Engines uses attrs (jsonb), Parts uses spec (jsonb). For the plugin in general, the JSON column name must be configurable per table.
@@ -367,7 +367,7 @@ Summary and Confirmation
    - JSON Attribute (eav_json) behavior and setup are unaffected.
    - jsonEncodeOnWrite default false globally; ignored in JSON Storage Mode; still respected for JSON Attribute.
 
-### Summary: Feature 3 – JSON Storage Mode (EAV in a single JSON/JSONB column)
+### Summary: Feature 3/EAV-13 – JSON Storage Mode (EAV in a single JSON/JSONB column)
 
 #### Overview
 - Goal: Add a “JSON Storage Mode” to the EAV plugin so all attributes for an entity can be stored in a single JSON/JSONB column on the entity’s table (e.g., Items.attrs, Products.spec) while maintaining typed queries and CakeORM ergonomics.
@@ -480,7 +480,7 @@ Summary and Confirmation
       - Optional migrations to add JSONB columns and indexes (GIN + functional)
   - Documentation refresh in README for JSON Storage Mode and indexing recommendations
 
-## Feature 4 — Setup Command (Interactive)
+## Feature 4/EAV-14 — Setup Command (Interactive) (Done)
 
 Goals
 - Provide an interactive setup wizard with driver-aware defaults and minimal required flags (flags remain for CI).
@@ -591,7 +591,7 @@ Tests (to add with implementation)
   - MySQL raw SQL generation sanity (header, tables present).
   - SQL Server/SQLite paths show fallback notice and write a migration.
 
-### Feature 4 — Interactive Setup Command (Completed Summary)
+### Feature 4 — Interactive Setup Command (Completed Summary) (Done)
 
 Overview
 - Implemented an interactive setup wizard that guides configuration and generates schema via migrations or raw SQL.
@@ -706,7 +706,7 @@ Future Work
 - Add interactive command tests (planned in Feature 8).
 - Documentation updates (README/PLAN) with screenshots and usage examples.
 
-## Feature 5 — EavEntities / EavAttributes / EavAttributeSets
+## Feature 5/EAV-15 — EavEntities / EavAttributes / EavAttributeSets (Done)
 
 Breaking change notice
 - We are renaming the core registry tables to be prefixed with eav_. This affects table names and class names:
@@ -896,7 +896,7 @@ Known deferrals (explicitly accepted for later features)
 Outcome
 - Feature 5 is complete. The plugin now fully uses prefixed registry tables/classes, provides working CRUD for EAV registries, enforces safe deletion, and exposes a setup path that generates the canonical schema. Remaining UI polish and test coverage gaps are planned in dedicated features and do not block this feature’s acceptance.
 
-## Feature 6 — Command connection handling
+## Feature 6/EAV-16 — Command connection handling (Done)
 
 Goals
 - Ensure every CLI command works correctly across multiple connections with minimal flags.
@@ -969,7 +969,7 @@ Developer runbook
     - Default connection: bin/cake eav create_attribute color:string -l "Color"
     - Specific connection: bin/cake eav create_attribute color:string -l "Color" --connection test
 
-## Feature 7 — Behavior consistency and finder
+## Feature 7/EAV-17 — Behavior consistency and finder
 
 Goals
 - Make EAV attributes behave like native fields in queries across both storage modes:
@@ -1109,7 +1109,7 @@ Acceptance
    - All plugin tests pass locally against Postgres with PHP 8.1, validating JSON and tables storage modes, command behavior, and setup generation.
    - Feature 7’s goals are achieved; the behavior now makes EAV attributes first-class citizens in ORM query building with sensible defaults and escape hatches.
 
-## Feature 8 — Tests (Unit, Integration, and UI) — Target 100% coverage
+## Feature 8/EAV-6 — Tests (Unit, Integration, and UI) — Target 100% coverage
 
 Goals
 - Achieve 100% coverage across behavior, commands, models, and controller integration tests for the baked UI.
@@ -1139,7 +1139,7 @@ Acceptance
 - All controller integration tests pass against the test connection.
 - No UI sort attempts on the “Actions” column; headers labeled plainly (no Paginator->sort on Actions).
 
-## Feature 9 — UI scaffolding (bake) and polish
+## Feature 9/EAV-1 — UI scaffolding (bake) and polish
 
 Status
 - CRUD has been baked for EavAttributes, EavAttributeSets, and EavEntities under plugin routes (/eav/*).
@@ -1177,7 +1177,7 @@ Acceptance
 Note
 - Controller integration tests for these flows will be implemented in Feature 8 to reach 100% coverage.
 
-## Feature 10 — Documentation
+## Feature 10/EAV-2 — Documentation
 - Rewrite README with:
   - Overview and capabilities (no 2.x migration notes).
   - Setup walkthrough (interactive prompts) with examples.
@@ -1436,7 +1436,7 @@ Acceptance (for Feature 11)
 - Public helper methods on EavSetupCommand exist as shims and are marked deprecated.
 - Unit tests cover new service components; command tests remain green without changes to their assertions.
 
-## Feature 12 — Migrate Native Fields to EAV (New)
+## Feature 12/EAV-19 — Migrate Native Fields to EAV (New)
 
 Goals
 - Provide a command to migrate one or more native columns from a source table into EAV attributes and values.
@@ -1473,7 +1473,7 @@ Acceptance
 - Summary includes totals per column and per type table; errors are explicit.
 - Optional “drop columns” template is printed on request but not executed automatically.
 
-## Feature 13 — Attribute Sets Import/Export, Usage Badges, and Delete Guardrails
+## Feature 13/EAV-18 — Attribute Sets Import/Export, Usage Badges, and Delete Guardrails
 
 Goals
 - Improve admin UX and portability of attribute configuration across environments.
@@ -1569,415 +1569,3 @@ Tests
 
 Acceptance
 - Entities can be associated with multiple attribute sets via Many-to-Many link.
-
-## Issues to Resolve (Triage Backlog — next working session)
-
-JIRA: EAV-21 — Remove label/options from eav_attributes and align code (schema, generator, UI, tests)
-
-Scope (small, independent, testable)
-- Align all code paths to the removal of label and options from eav_attributes (migration already baked: 20260111082804_RemoveFieldsFromEavAttributes.php).
-- Do not add new columns (placeholder/title) in this issue; that will be a follow-up.
-- Do not change CLI argument style (name:type) here; that belongs to EAV-22.
-
-Changes required
-- Generator:
-  - EavSetupCommand#buildMigration and #buildRawSql must stop emitting label and options for eav_attributes.
-- Command:
-  - EavCreateAttributeCommand must stop reading/writing label/options and remove the --label option from help/usage (keep name:type parsing for now).
-- UI (Attributes):
-  - Remove label and options controls from add/edit templates.
-  - On index, remove label/options columns and ensure the Actions header is NOT sortable (plain label).
-- Tests/fixtures:
-  - Update EavAttributesFixture: drop label and options fields and seed.
-  - Update EavCreateAttributeCommandTest: remove -l/label usage and schema bootstrap for label/options; adjust assertions.
-  - Update EavBehaviorTest setUpBeforeClass schema bootstrap for eav_attributes (no label/options).
-
-Acceptance
-- All plugin tests pass (behavior/command/model).
-- No code references to label or options remain.
-- EavSetupCommand dry-run output for eav_attributes does not include label/options (both migration and raw SQL).
-- Attributes UI renders without label/options fields and with a plain “Actions” header.
-
-Runbook (validation)
-- Apply the baked migration (if not applied already):
-  - bin/cake migrations migrate -p Eav -c test
-- Dry-run the setup generator:
-  - bin/cake eav setup --dry-run --connection test --pk-type uuid --uuid-type nativeuuid --json-storage json --types defaults
-  - Confirm eav_attributes contains only id, name, data_type, created, modified
-- Run tests:
-  - vendor/bin/phpunit plugins/Eav/tests
-
-Feature Chat prompt (paste this verbatim into the dedicated implementation chat)
-You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue we are working on is EAV-21 — Remove label/options from eav_attributes and align code (schema, generator, UI, tests). You are in Ask Mode. We will start with a minimal plan, then I will put you in Edit Mode to implement. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: whenever possible, perform all non-overlapping edits to each file in a single SEARCH/REPLACE block; otherwise provide a full-file replacement. Do not split multiple blocks for the same file.
-
-Context
-- Migration already exists and removes label/options:
-  - plugins/Eav/config/Migrations/20260111082804_RemoveFieldsFromEavAttributes.php
-- Files to modify:
-  - plugins/Eav/src/Command/EavSetupCommand.php (buildMigration + buildRawSql must stop emitting label/options)
-  - plugins/Eav/src/Command/EavCreateAttributeCommand.php (remove use of --label; stop writing label/options; keep name:type for now)
-  - plugins/Eav/templates/EavAttributes/add.php (remove label/options controls)
-  - plugins/Eav/templates/EavAttributes/index.php (remove label/options columns; Actions header not sortable; remove unused imports)
-  - plugins/Eav/tests/Fixture/EavAttributesFixture.php (drop label/options fields and data)
-  - plugins/Eav/tests/TestCase/Command/EavCreateAttributeCommandTest.php (remove -l usage; update schema bootstrap; adjust assertions)
-  - plugins/Eav/tests/TestCase/Model/Behavior/EavBehaviorTest.php (update eav_attributes schema bootstrap to exclude label/options)
-  - plugins/Eav/tests/TestCase/Model/Table/EavAttributesTableTest.php (remove creation/use of label/options in tests)
-
-Plan (concise)
-1) Update EavSetupCommand (migration + raw SQL builders) so eav_attributes does NOT include label or options.
-2) Update EavCreateAttributeCommand to stop reading/writing label/options and remove the --label option from usage/help; keep name:type parsing unchanged for now.
-3) Update EavAttributes templates:
-   - add.php: remove label/options fields
-   - index.php: remove label/options columns, use a plain “Actions” header (no Paginator->sort on Actions), remove unused imports
-4) Update fixtures/tests:
-   - EavAttributesFixture: remove label/options fields; adjust seed
-   - EavCreateAttributeCommandTest: remove -l "Color"; remove schema bootstrap for label/options; adjust assertions
-   - EavBehaviorTest::setUpBeforeClass: adjust eav_attributes schema (no label/options)
-   - EavAttributesTableTest: remove references to label/options in test data
-5) Run tests and ensure green
-
-Acceptance
-- No code references to label or options remain
-- Setup generator (dry-run) no longer emits label/options for eav_attributes in both migration and raw SQL
-- UI renders without label/options; Actions header is not sortable
-- All tests green
-
-Constraints
-- CakePHP 5.2
-- Single-block-per-file SEARCH/REPLACE where possible
-- Minimal, focused edits; no new fields added in this issue (placeholder/help_text will be a separate issue)
-
-JIRA: EAV-22 — Add placeholder/help_text fields to eav_attributes and wire UI (small, independent)
-
-Scope (tight, testable)
-- Introduce two nullable columns on eav_attributes for inline UI hints:
-  - placeholder VARCHAR(255) NULL
-  - help_text VARCHAR(255) NULL (stored column; currently rendered in the HTML title attribute)
-- No other schema changes. Label/options remain removed via EAV-21.
-- No CLI changes in this issue (CreateAttribute flags remain as-is until EAV-Cmd-01).
-
-Changes required
-- Schema
-  - Add a new versioned migration class (timestamped class name) to add columns placeholder and help_text to eav_attributes.
-- Generator
-  - EavSetupCommand:
-    - buildMigration: when creating eav_attributes, include placeholder and help_text (both nullable).
-    - buildRawSql: include placeholder and help_text in CREATE TABLE eav_attributes for Postgres/MySQL.
-- UI (Attributes)
-  - add.php and edit.php:
-    - Add optional fields placeholder and help_text controls.
-    - Use help_text as inline help via the HTML title attribute for now.
-  - index.php:
-    - Optional visibility of placeholder/help_text columns (non-blocking; acceptable to defer).
-- Tests/fixtures
-  - EavAttributesFixture: add placeholder/help_text to $fields; set to null in seed.
-  - Any test schema bootstrap defining eav_attributes (e.g., Behavior tests): include placeholder/help_text columns.
-
-Acceptance
-- Migration applies cleanly on test connection; columns appear in eav_attributes.
-- Setup generator (dry-run) for migrations and raw SQL includes placeholder/help_text in eav_attributes.
-- Attributes add/edit forms show placeholder/help_text; saving persists values.
-- Tests/fixtures updated; suite remains green.
-- No reintroduction of label/options; no CLI changes in this issue.
-
-Runbook (validation)
-- Bake and apply migration:
-  - bin/cake bake migration -p Eav AddPlaceholderAndHelpTextToEavAttributes
-  - bin/cake migrations migrate -p Eav -c test
-- Dry-run generator (migrations path):
-  - bin/cake eav setup --dry-run --connection test --pk-type uuid --uuid-type nativeuuid --json-storage json --types defaults
-  - Confirm eav_attributes definition includes placeholder/help_text in both migration and raw SQL payloads
-- UI sanity:
-  - /eav/eav-attributes/add shows placeholder/help_text; saving persists values.
-
-Feature Chat prompt (paste into the dedicated implementation chat)
-You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue we are working on is EAV-22 — Add placeholder/help_text fields to eav_attributes and wire UI (schema, generator, UI, tests). You are in Ask Mode. We will start with a minimal plan, then I will put you in Edit Mode to implement. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: whenever possible, perform all non-overlapping edits to each file in a single SEARCH/REPLACE block; otherwise provide a full-file replacement. Do not split multiple blocks for the same file.
-
-Context
-- EAV-21 removed label/options. We now add:
-  - eav_attributes.placeholder (string, 255, null)
-  - eav_attributes.help_text (string, 255, null)
-- Files to modify:
-  - plugins/Eav/config/Migrations/<new_migration>.php (add columns via a new versioned migration; do NOT edit old migrations)
-  - plugins/Eav/src/Command/EavSetupCommand.php (buildMigration + buildRawSql must include placeholder/help_text in the eav_attributes CREATE logic)
-  - plugins/Eav/templates/EavAttributes/add.php (add placeholder/help_text controls)
-  - plugins/Eav/templates/EavAttributes/edit.php (add placeholder/help_text controls)
-  - plugins/Eav/tests/Fixture/EavAttributesFixture.php (add schema fields; seed nulls)
-  - plugins/Eav/tests/TestCase/** where eav_attributes schema is bootstrapped (e.g., EavBehaviorTest::setUpBeforeClass): include placeholder/help_text
-
-Plan (concise)
-1) Create a new migration (timestamped class) adding placeholder and help_text columns to eav_attributes.
-2) Update EavSetupCommand generator (migration + raw SQL builders) to include placeholder/help_text when creating eav_attributes.
-3) Update Attributes templates (add/edit) to expose placeholder/help_text controls; render help_text as HTML title for now.
-4) Update fixtures and any schema bootstrap in tests to include placeholder/help_text; keep seed values null.
-5) Run tests; ensure all green.
-
-Acceptance
-- Migration succeeds; columns present.
-- Setup generator dry-run includes placeholder/help_text in both migration and raw SQL outputs.
-- UI shows placeholder/help_text controls; saved values persist.
-- Tests updated and passing.
-
-Constraints
-- CakePHP 5.2
-- Single-block-per-file SEARCH/REPLACE where possible; otherwise full-file replacement
-- Keep scope limited to placeholder/help_text; do not reintroduce label/options; do not change CLI argument style here.
-
----
-
-JIRA: EAV-23 — Ensure CakePHP 5.x migrations extend BaseMigration (audit + generator fix)
-
-Scope (tight, testable)
-- Audit all plugin migrations and ensure classes extend Migrations\BaseMigration (not AbstractMigration).
-- Update any existing committed migration files in this plugin that still extend AbstractMigration.
-- Update the setup generator to always emit BaseMigration in generated migration payloads.
-
-Changes required
-- Migration files (repo audit)
-    - plugins/Eav/config/Migrations/*.php: all classes must use:
-        - use Migrations\BaseMigration;
-        - class <Name> extends BaseMigration
-- Generator
-    - plugins/Eav/src/Command/EavSetupCommand.php:
-        - buildMigration output must import Migrations\BaseMigration and extend BaseMigration.
-    - Raw SQL generation is unaffected (no PHP class).
-- Tests
-    - No functional changes expected; run the suite to guard regressions.
-
-Acceptance
-- grep for “extends AbstractMigration” returns no hits in the plugin.
-- EavSetupCommand dry-run outputs a migration that:
-    - Imports Migrations\BaseMigration
-    - Extends BaseMigration
-- All plugin tests green.
-
-Runbook (validation)
-- Search and verify:
-    - git grep -n "extends AbstractMigration" plugins/Eav || echo "OK: none"
-- Dry-run generator:
-    - bin/cake eav setup --dry-run --connection test --pk-type uuid --uuid-type nativeuuid --json-storage json --types defaults
-    - Confirm the emitted class uses BaseMigration (not AbstractMigration).
-- Run tests:
-    - vendor/bin/phpunit plugins/Eav/tests
-
-Feature Chat prompt (paste into the dedicated implementation chat)
-You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue is EAV-23 — Ensure CakePHP 5.x migrations extend BaseMigration (audit + generator fix). You are in Ask Mode. We will make a minimal plan, then switch to Edit Mode. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: whenever possible, perform all non-overlapping edits to each file in a single SEARCH/REPLACE block; otherwise provide a full-file replacement.
-
-Tasks
-1) Update any plugin migration classes under plugins/Eav/config/Migrations that extend AbstractMigration to extend Migrations\BaseMigration:
-    - Add “use Migrations\BaseMigration;”
-    - Change “extends AbstractMigration” to “extends BaseMigration”
-    - Remove any “use Migrations\AbstractMigration;”
-2) Update plugins/Eav/src/Command/EavSetupCommand.php so buildMigration emits:
-    - “use Migrations\BaseMigration;” and “class <Name> extends BaseMigration”
-3) Run grep to confirm no AbstractMigration remains and run the test suite.
-
-Constraints
-- Only touch plugin files; no app-level migrations.
-- Do not surface JSON Storage options or prompts; tables storage is the default.
-
-Acceptance
-- No “extends AbstractMigration” remains.
-- Generator emits BaseMigration classes.
-- Tests green.
-
----
-
-JIRA: EAV-24 — Normalize behavior config keys to "attributes" (remove "map" and "attributeTypeMap")
-
-Scope (small, independent, testable)
-- Replace dual keys with a single canonical config key on the behavior:
-    - attributes: array keyed by attribute/field name
-        - Example (tables storage): 'attributes' => ['color' => ['type' => 'string', 'persist' => true]]
-        - Example (JSON storage): 'attributes' => ['year_start' => ['type' => 'integer']] (persist ignored in json_column mode)
-- Remove support for 'map' and 'attributeTypeMap' to eliminate ambiguity (no back-compat required in this project).
-- Keep storage default = tables; do not surface JSON Storage options in this issue.
-
-Changes required
-- Behavior (plugins/Eav/src/Model/Behavior/EavBehavior.php)
-    - Default config: drop 'map' and 'attributeTypeMap'; add 'attributes' => [].
-    - beforeMarshal/afterSave (tables storage): read 'attributes' and persist only entries with ['persist' => true] (or default true if you prefer). JSON storage ignores persist.
-    - beforeFind: use 'attributes' for type hints and projections across both storage modes; add per-query overrides via eavTypes as today.
-    - Update internal helpers to source typing hints from 'attributes' only.
-- Tests
-    - Update behavior tests to provide 'attributes' config and remove references to 'map'/'attributeTypeMap'.
-    - Verify persistence via afterSave in tables mode when persist=true.
-    - Verify type hinting in JSON storage via 'attributes' config.
-- Docs
-    - Update examples in README/PLAN to use 'attributes' exclusively.
-
-Acceptance
-- Behavior works with 'attributes' only; 'map' and 'attributeTypeMap' are no longer recognized.
-- Tables storage: values defined with persist=true are saved on afterSave; others are not persisted automatically.
-- JSON storage: type hints provided via 'attributes' are used for projections/where/order and hydration; no persistence behavior changes.
-- All updated tests pass; no JSON Storage options are surfaced in commands/UI by this issue.
-
-Runbook (validation)
-- Update a behavior attach in tests to:
-    - 'attributes' => ['color' => ['type' => 'string', 'persist' => true], 'year_start' => ['type' => 'integer']]
-- In tables mode: save an entity with color and ensure eav_string row is created (persist=true).
-- In JSON storage mode: ensure queries orderByAsc('year_start') and where(['year_start >=' => 2010]) behave correctly with types inferred from attributes config.
-- Run: vendor/bin/phpunit plugins/Eav/tests
-
-Feature Chat prompt (paste into the dedicated implementation chat)
-You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue we are working on is EAV-24 — Create Attribute UX consistency (flags-only). You are in Ask Mode. We will start with a minimal plan, then I will put you in Edit Mode to implement. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: when editing a file, perform all non-overlapping changes in a single SEARCH/REPLACE block; otherwise provide a full-file replacement. Do not split multiple blocks for the same file.
-Scope
-Require flags only:
---name  , --type   (both required)
-Keep --connection
-Remove name:type parsing and --label entirely.
-Do not surface any JSON Storage options.
-Files to modify
-plugins/Eav/src/Command/EavCreateAttributeCommand.php
-plugins/Eav/tests/TestCase/Command/EavCreateAttributeCommandTest.php
-Plan
-Command:
-Remove colon parsing logic.
-Add required options --name and --type via buildOptionParser (mark required or validate in execute with a clear error).
-Update usage/help messaging.
-Keep normalizeType logic and --connection handling as-is.
-Tests:
-Update calls to:
-eav create_attribute --name color --type string --connection test
-Duplicate run should print “Attribute already exists: color”
-Add negative tests for missing --name or --type returning a usage error and non-zero exit.
-Acceptance
-Running without --name or --type returns a clear error and non-zero exit.
-With both flags, attribute is created with normalized type.
-Duplicate call is a no-op with the existing message.
-Tests green.
- ---
-
-JIRA: EAV-25 — Remove residual label/options usage (code and templates)
-
-Scope (small, independent, testable)
-- Eliminate all remaining references to the removed label/options fields in code, templates, and tests.
-- Remove any accidentally committed generated setup migration that still defines label/options.
-
-Changes required
-- Commands/Behavior:
-    - plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php
-        - Attribute creation path: remove 'options' from newEntity([...]).
-    - plugins/Eav/src/Model/Behavior/EavBehavior.php
-        - attributeId(): remove 'options' from newEntity([...]).
-- UI:
-    - plugins/Eav/templates/EavAttributeSets/view.php
-        - Drop the “Label” and “Options” columns and corresponding cells from the “Related Eav Attributes” table.
-- Entity metadata:
-    - plugins/Eav/src/Model/Entity/EavAttribute.php
-        - Update PHPDoc and $_accessible to reflect current columns (name, data_type, placeholder, help_text, created, modified). Remove label/options entries.
-- Migrations (cleanup):
-    - Remove any committed generated setup migration that still creates label/options (e.g., plugins/Eav/config/Migrations/20251228222358_eav_setup.php) from VCS.
-- Tests:
-    - plugins/Eav/tests/TestCase/Command/EavMigrateJsonbToEavCommandTest.php::setUpBeforeClass
-        - Ensure the bootstrap schema for eav_attributes does NOT add label/options (use placeholder/help_text or rely on EavAttributesFixture).
-    - Grep the test suite for label/options references and update/remove as needed.
-
-Acceptance
-- No code path sets eav_attributes.options or reads label/options.
-- Attribute Sets “view” renders without Label/Options columns.
-- EavAttribute entity metadata reflects placeholder/help_text (no label/options).
-- No generated setup migration with label/options remains tracked in VCS.
-- All tests pass.
-
-Runbook (validation)
-- Grep for residuals:
-    - git grep -nE "\blabel\b|\boptions\b" plugins/Eav | grep -v help_text | grep -v placeholder
-- Remove accidental setup migration (if still tracked):
-    - git rm --cached plugins/Eav/config/Migrations/20251228222358_eav_setup.php
-- Run tests:
-    - vendor/bin/phpunit plugins/Eav/tests
-
-Feature Chat prompt (paste into the dedicated implementation chat)
-You are my AI Coding Assistant running in the Proxy AI plugin in JetBrains PHPStorm. The issue we are working on is EAV-25 — Remove residual label/options usage (code and templates). You are in Ask Mode. We will start with a minimal plan, then I will put you in Edit Mode to implement. Use CakePHP 5.2 APIs only. Follow the Editing Guidelines: when editing a file, perform all non-overlapping changes in a single SEARCH/REPLACE block; otherwise provide a full-file replacement. Do not split multiple blocks for the same file.
-
-Scope
-- Remove label/options from attribute creation code paths:
-    - plugins/Eav/src/Command/EavMigrateJsonbToEavCommand.php: newEntity([...]) must not include 'options'.
-    - plugins/Eav/src/Model/Behavior/EavBehavior.php: attributeId() newEntity([...]) must not include 'options'.
-- Update the Attribute Sets view to drop label/options columns:
-    - plugins/Eav/templates/EavAttributeSets/view.php: remove Label/Options headers and cells in the related attributes table.
-- Align the EavAttribute entity metadata:
-    - plugins/Eav/src/Model/Entity/EavAttribute.php: update PHPDoc and $_accessible to reflect (name, data_type, placeholder, help_text, created, modified); remove label/options.
-- Fix any test bootstrap still modeling old schema:
-    - plugins/Eav/tests/TestCase/Command/EavMigrateJsonbToEavCommandTest.php::setUpBeforeClass: remove label/options bootstrap; rely on fixture or use placeholder/help_text.
-- Do not add JSON Storage options; default storage is tables.
-
-Plan
-1) Edit EavMigrateJsonbToEavCommand: remove 'options' from attributes creation payload.
-2) Edit EavBehavior#attributeId: remove 'options' from attributes creation payload.
-3) Edit templates/EavAttributeSets/view.php: delete Label/Options columns and cells.
-4) Edit Model/Entity/EavAttribute.php: update PHPDoc and $_accessible to placeholder/help_text; remove label/options.
-5) Edit EavMigrateJsonbToEavCommandTest::setUpBeforeClass: update eav_attributes schema bootstrap to current shape or rely on EavAttributesFixture only.
-6) Remove any generated setup migration with label/options from VCS (git rm --cached).
-7) Run tests.
-
-Acceptance
-- No creation code references 'options'.
-- Attribute Sets view has no Label/Options columns.
-- EavAttribute entity metadata matches schema (placeholder/help_text; no label/options).
-- Tests pass.
-
----
-
-3) Behavior config key normalization (map vs attributeTypeMap)
-- Problem
-  - Two config keys: map (tables storage write map) vs attributeTypeMap (JSON typing hints). Inconsistent and confusing.
-- Decision proposal
-  - Canonicalize to attributes (single key): attributes['color']['type']='string', with optional persist=true for tables storage writes. For JSON storage, persist is ignored.
-  - Given no external users yet, remove map/attributeTypeMap support; convert internally in EavBehavior once.
-  - Paul: Not sure what the intention is here. You mention removing map support. Are you saying we will no longer use the map in the config and only config through the UI?
-- Next steps
-  - Update EavBehavior to accept attributes only; adjust beforeMarshal/afterSave/beforeFind to use it; update tests and README examples.
-- JIRA
-  - EAV-Beh-01: Replace map/attributeTypeMap with attributes; update tests and docs.
-
-4) Value table entity reference (entity_table string(191) vs FK to eav_entities)
-- Problem
-  - entity_table is VARCHAR(191), inherited from MySQL index-era constraints; arbitrary on Postgres; not relational. In 2.x this referenced EntityTypes by UUID.
-- Decision options
-  - A) Keep entity_table now; revisit later.
-  - B) Convert to eav_entity_id UUID FK referencing eav_entities(id); drop entity_table; faster joins; relational integrity.
-  - Paul: In 2.x we had Entity Types. Now, we have EavEntities which is essentially the same. The entity_table should now reference our EavEntities table. In 2.x, we also used composite PKs. We didn't have an id, entity_id, and attribute_id, just entity_id and attribute_id. One of the AI agents said that we couldn't do it and it was complicated, but it has been well supported in CakePHP since at least 2.x if not since 1.3. The other issue is the size. I have no idea where the agent came up with 191 characters for the entities table either.
-- Recommendation
-  - Adopt B in a dedicated feature (breaking change). Keep A temporarily to stabilize. Plan migration path.
-  - Paul: Since this plugin is not being publicly used, I am ok with breaking changes.
-- Next steps
-  - Design migration: add eav_entity_id, backfill from entity_table using eav_entities mapping, then drop entity_table; update behavior and generator; update unique index to (eav_entity_id, entity_id, attribute_id).
-  - Paul: Your comment regarding the inex, alerted me to another issue. The attribute_id needs to be changed to eav_attribute_id. We may actually need to change eav_entities to eav_entity_types, however, this may be able to be inferred as well, at least when using uuids. In 2.x there everything was uuid and we didn't have an option for int PKs. So it might make sense to change eav_entities to eav_entity_types.
-- JIRA
-  - EAV-Schema-01: Switch entity_table -> eav_entity_id (FK to eav_entities); migration + behavior/generator updates.
-
-5) Composite PK mode (Lean keys) for UUID installs
-- Problem
-  - Current AV rows have id + unique(entity_table/entity_id/attribute_id). For UUID-only installs, composite PK (entity_id, attribute_id) reduces overhead.
-- Decision proposal
-  - Implement optional “Lean keys” mode in a future feature for UUID-only installs:
-    - Composite PK on (eav_entity_id, entity_id, attribute_id) or (entity_id, attribute_id) if not adopting eav_entity_id.
-  - Default remains stable for now.
-  - Paul: I would rather this be right. Since no one is using the plugin yet, including me, I would rather not leave garbage code in for backwards compatibility because there are no apps that we need to be backwards compatible for and this will only lead to confusion for AI agents. I did just review the schema from one of my projects that used the eav_plugin and the value tables did have an id, entity_id, and attribute_id. So they were not using a composite PK. Attributes are associated with the EavEntity or EntityType. The value tables do not need that association.
-- Next steps
-  - Add a feature flag in Setup; generate composite PK variant when enabled; adjust behavior upserts (saveEavValue) accordingly.
-- JIRA
-  - EAV-Keys-01: Lean keys mode for UUID installs (composite PK); generator + behavior support.
-
-6) Default storage mode and terminology
-- Problem
-  - You’re using tables storage with UUID. JSON Storage is optional and off for now; docs/UI should make this unambiguous. Terminology (“JSON Attribute” vs “JSON Storage”) must be consistent.
-- Decision proposal
-  - Keep storage => 'tables' as default. JSON Storage remains documented optional with clear enablement. Keep “JSON Attribute column type” wording for eav_json only.
-  - Paul: This is good and avoids confusion
-- Next steps
-  - Update docs (Feature 10) and any prompts/tooltips to reinforce default = tables; JSON Storage is opt-in per table.
-- JIRA
-  - EAV-Docs-01: Clarify storage defaults and JSON terminology in README.
-
-7) UI cleanup (Attributes/AttributeSets/Entities)
-- Problems
-  - Attributes add/edit still show label/options; Actions column sortable; inconsistent headings.
-  - Paul: We still need placeholders and help text to define data types and probably attributes. However, this needs to be handled in a component or helper instead of in a view file. In 2.x we had a table for Data Types. This would have been a good place to store the helper text, but it creates an issue of having to query that table. I like the ability to configure the plugin through the UI, but it also complicates things and has performance implication unless we cache those queries. If we use cachine, we could have a Data Types object with an enabled flag to indicate which data types we are using. The other option is instead of having a default set of data types with the option to add additional data types, we just use the full list supported by Type Factory. I don't know that there is any value is having a default set with optional data types if they are all supported by the Type Factory. The only advantage to optional data types is a reduced number of attribute value tables. But if they aren't used, then it doesn't really add any overhead. On a similar note. AttributeSets is a new feature but really may not be necessary. I see opportunities in which it could be used, but still not necessary and add complication. These AI agents tend to overengineer things making them more complicated than they need to be. In addition, since PHP and CakePHP in particular have fallen out of favor, this plugin likely won't be used much at all. It has essentially become a project that simply shows activity on my github profile. And it is entirely possible that this will get migrated to Django because ProtechParts may also get migrated to Django. As much as I like CakePHP, it has essentially become obsolete and PHP is heading that way too. One of the reasons, I am continuing with this is comfort level. Once this is working in CakePHP I have a base and framework to migrate to Django.
-- Decision proposal
-  - Remove label/options controls; render clean help text; ensure Actions isn’t sortable; keep membership checkboxes; keep Entities form polish (smart defaults).
-- Next steps
-  - Update Attributes/AttributeSets/Entities templates accordingly; remove stray imports; verify badges and pagination.
-- JIRA

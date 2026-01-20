@@ -13,3 +13,5 @@ AGENTS-VSCode.md
 /config/Sql/20251228204211_eav_setup_postgres.sql
 /config/Migrations/20251228222358_eav_setup.php
 /config/Migrations/20251228222416_eav_setup_test.php
+/ISSUES_TO_RESOLVE.md
+/MASTER_PLAN_CHAT_SUMMARY.md
