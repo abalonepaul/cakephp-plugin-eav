@@ -5,6 +5,10 @@ namespace Eav;
 
 use Cake\Console\CommandCollection;
 use Cake\Core\BasePlugin;
+use Cake\Core\Configure;
+use Cake\Core\Configure\Engine\JsonConfig;
+use Cake\Core\Plugin;
+use Cake\Core\PluginApplicationInterface;
 use Cake\Routing\Route\DashedRoute;
 use Cake\Routing\RouteBuilder;
 use Eav\Command\EavCreateAttributeCommand;
@@ -19,6 +23,27 @@ use Eav\Command\EavSetupInteractiveCommand;
  */
 class EavPlugin extends BasePlugin
 {
+    public function bootstrap(PluginApplicationInterface $app): void
+    {
+        parent::bootstrap($app);
+
+        // Load plugins/Eav/config/eav.json into Configure under the 'Eav' namespace
+        try {
+            $configDir = Plugin::path('Eav') . 'config' . DIRECTORY_SEPARATOR;
+            $configFile = $configDir . 'eav.json';
+            if (is_file($configFile)) {
+                $raw = file_get_contents($configFile);
+                $eav_config = $raw !== false ? json_decode($raw, true) : null;
+                if (is_array($eav_config)) {
+                    // Write full config namespace for easy access
+                    Configure::write('Eav', $eav_config);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fail quietly; components/controllers fall back to hardcoded safe defaults
+        }
+    }
+
     /**
      * Register console commands.
      *

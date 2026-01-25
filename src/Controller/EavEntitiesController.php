@@ -14,6 +14,12 @@ use Cake\Utility\Inflector;
  */
 class EavEntitiesController extends AppController
 {
+    public function initialize(): void
+    {
+        parent::initialize();
+        $this->loadComponent('Eav.Eav');
+    }
+
     /**
      * Build UI choice lists for add/edit forms.
      *
