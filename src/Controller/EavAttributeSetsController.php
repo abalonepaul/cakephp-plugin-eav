@@ -12,6 +12,13 @@ use App\Controller\AppController;
  */
 class EavAttributeSetsController extends AppController
 {
+    public function initialize(): void
+    {
+        parent::initialize();
+        // Provide optional admin prefix (and future shared UI config) via component
+        $this->loadComponent('Eav.Eav');
+    }
+
     /**
      * Index method
      *

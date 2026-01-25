@@ -1186,6 +1186,31 @@ Note
   - jsonEncodeOnWrite and hydration expectations.
   - Behavior attachment and mapping examples.
 
+Getting Started (tables storage; recommended default)
+- Attach EavBehavior to application Tables where you need dynamic attributes. Use the canonical ‘attributes’ config key (no map/attributeTypeMap). Example:
+
+  EnginesTable (tables storage, UUID):
+  - behavior config:
+    - 'entityTable' => 'engines'
+    - 'pkType' => 'uuid'
+    - 'storage' => 'tables'
+    - 'attributes' => [
+        'color' => ['type' => 'string', 'persist' => true],
+        'year_start' => ['type' => 'integer', 'persist' => true],
+        // Optional alias for public field -> underlying attribute name:
+        // 'sku' => ['attribute' => 'part_number', 'type' => 'string', 'persist' => true],
+      ]
+
+  How to use:
+  - Query: $Engines->find()->where(['color' => 'red'])->orderByDesc('year_start')->all();
+  - Select: $Engines->find()->select(['id', 'color', 'year_start'])->first();
+  - Save: $e = $Engines->get($id); $e->set('color', 'blue'); $Engines->save($e);
+
+  Notes:
+  - 'persist' applies only in tables storage; JSON Storage Mode ignores it.
+  - If 'attribute' is omitted, the public field key is used as the attribute name.
+  - Collision guard ensures native columns are not rewritten as EAV attributes.
+
 Storage modes and when to choose which
 - Typed EAV tables (“tables” storage, default):
     - Best when attributes are shared across many entities, you need per-attribute constraints/joins, or DB portability matters.

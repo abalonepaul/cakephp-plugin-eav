@@ -12,6 +12,13 @@ use App\Controller\AppController;
  */
 class EavAttributesController extends AppController
 {
+    public function initialize(): void
+    {
+        parent::initialize();
+        // Load EAV UI/component to supply data types and optional admin prefix.
+        $this->loadComponent('Eav.Eav');
+    }
+
     /**
      * Index method
      *
@@ -61,7 +68,8 @@ class EavAttributesController extends AppController
             $this->Flash->error(__('The attribute could not be saved. Please, try again.'));
         }
         $eavAttributeSets = $this->EavAttributes->EavAttributeSets->find('list', limit: 500)->all();
-        $this->set(compact('eavAttribute', 'eavAttributeSets'));
+        $dataTypeOptions = $this->Eav->getDataTypeOptions();
+        $this->set(compact('eavAttribute', 'eavAttributeSets', 'dataTypeOptions'));
     }
 
     /**
@@ -83,7 +91,8 @@ class EavAttributesController extends AppController
             $this->Flash->error(__('The attribute could not be saved. Please, try again.'));
         }
         $eavAttributeSets = $this->EavAttributes->EavAttributeSets->find('list', limit: 500)->all();
-        $this->set(compact('eavAttribute', 'eavAttributeSets'));
+        $dataTypeOptions = $this->Eav->getDataTypeOptions();
+        $this->set(compact('eavAttribute', 'eavAttributeSets', 'dataTypeOptions'));
     }
 
     /**
