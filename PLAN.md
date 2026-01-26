@@ -559,7 +559,7 @@ Outputs
 
 Schema specifics for all eav_* tables (unchanged)
 - id: UUID (row id via chosen uuidType)
-- entity_table: string(191)
+- entity_table: string(255)
 - entity_id: uuidType or biginteger based on PK family
 - attribute_id: UUID
 - value: per eav_<type> (json/jsonb for eav_json), NULL allowed
@@ -725,8 +725,8 @@ Goals
   - EavEntities acts as an entity registry; values continue to live in eav_* typed tables or JSON Storage Mode per table (the Behavior provides access).
 - Validation and behaviors:
   - Add Timestamp behavior across all models.
-  - EavAttributes: name required/unique (<=191), data_type required (validated against TypeFactory/custom).
-  - EavAttributeSets: name required/unique (<=191).
+  - EavAttributes: name required/unique (<=255), data_type required (validated against TypeFactory/custom).
+  - EavAttributeSets: name required/unique (<=255).
   - EavAttributeSetAttributes: composite PK (attribute_set_id, attribute_id), position integer >= 0 (nullable, default 0).
   - EavEntities: name required/unique; optional model_alias/table_name; storage_default enum (tables|json_column); optional json_column; pk_type (uuid|int), uuid_subtype (uuid|binaryuuid|nativeuuid).
 

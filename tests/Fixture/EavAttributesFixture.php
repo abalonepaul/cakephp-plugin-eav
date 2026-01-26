@@ -27,7 +27,7 @@ class EavAttributesFixture extends TestFixture
      */
     public array $fields = [
         'id' => ['type' => 'uuid', 'null' => false],
-        'name' => ['type' => 'string', 'length' => 191, 'null' => false],
+        'name' => ['type' => 'string', 'length' => 255, 'null' => false],
         'data_type' => ['type' => 'string', 'length' => 50, 'null' => false],
         'placeholder' => ['type' => 'string', 'length' => 255, 'null' => true],
         'help_text' => ['type' => 'string', 'length' => 255, 'null' => true],

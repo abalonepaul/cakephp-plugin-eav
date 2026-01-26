@@ -56,19 +56,19 @@ class EavEntitiesTable extends Table
     {
         $validator
             ->scalar('name')
-            ->maxLength('name', 191)
+            ->maxLength('name', 255)
             ->requirePresence('name', 'create')
             ->notEmptyString('name')
             ->add('name', 'unique', ['rule' => 'validateUnique', 'provider' => 'table']);
 
         $validator
             ->scalar('model_alias')
-            ->maxLength('model_alias', 191)
+            ->maxLength('model_alias', 255)
             ->allowEmptyString('model_alias');
 
         $validator
             ->scalar('table_name')
-            ->maxLength('table_name', 191)
+            ->maxLength('table_name', 255)
             ->allowEmptyString('table_name');
 
         $validator
@@ -78,7 +78,7 @@ class EavEntitiesTable extends Table
 
         $validator
             ->scalar('json_column')
-            ->maxLength('json_column', 191)
+            ->maxLength('json_column', 255)
             ->allowEmptyString('json_column');
 
         $validator

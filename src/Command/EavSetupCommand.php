@@ -471,7 +471,7 @@ class {$className} extends BaseMigration
         if (!\$this->hasTable('eav_attributes')) {
             \$this->table('eav_attributes', ['id' => false, 'primary_key' => ['id']])
                 ->addColumn('id', '{$uuidType}', ['null' => false])
-                ->addColumn('name', 'string', ['limit' => 191, 'null' => false])
+                ->addColumn('name', 'string', ['limit' => 255, 'null' => false])
                 ->addColumn('data_type', 'string', ['limit' => 50, 'null' => false])
                 ->addColumn('placeholder', 'string', ['limit' => 255, 'null' => true])
                 ->addColumn('help_text', 'string', ['limit' => 255, 'null' => true])
@@ -483,7 +483,7 @@ class {$className} extends BaseMigration
         if (!\$this->hasTable('eav_attribute_sets')) {
             \$this->table('eav_attribute_sets', ['id' => false, 'primary_key' => ['id']])
                 ->addColumn('id', '{$uuidType}', ['null' => false])
-                ->addColumn('name', 'string', ['limit' => 191, 'null' => false])
+                ->addColumn('name', 'string', ['limit' => 255, 'null' => false])
                 ->addTimestamps('created', 'modified')
                 ->addIndex(['name'], ['unique' => true, 'name' => 'idx_eav_attribute_sets_name'])
                 ->create();
@@ -493,11 +493,11 @@ class {$className} extends BaseMigration
         if (!\$this->hasTable('eav_entities')) {
             \$this->table('eav_entities', ['id' => false, 'primary_key' => ['id']])
                 ->addColumn('id', '{$uuidType}', ['null' => false])
-                ->addColumn('name', 'string', ['limit' => 191, 'null' => false])
-                ->addColumn('model_alias', 'string', ['limit' => 191, 'null' => true])
-                ->addColumn('table_name', 'string', ['limit' => 191, 'null' => true])
+                ->addColumn('name', 'string', ['limit' => 255, 'null' => false])
+                ->addColumn('model_alias', 'string', ['limit' => 255, 'null' => true])
+                ->addColumn('table_name', 'string', ['limit' => 255, 'null' => true])
                 ->addColumn('storage_default', 'string', ['limit' => 20, 'null' => false, 'default' => 'tables'])
-                ->addColumn('json_column', 'string', ['limit' => 191, 'null' => true])
+                ->addColumn('json_column', 'string', ['limit' => 255, 'null' => true])
                 ->addColumn('pk_type', 'string', ['limit' => 10, 'null' => false, 'default' => 'uuid'])
                 ->addColumn('uuid_subtype', 'string', ['limit' => 20, 'null' => true])
                 ->addTimestamps('created', 'modified')
@@ -526,13 +526,14 @@ class {$className} extends BaseMigration
             \$table = \$this->table(\$spec['table'], ['id' => false, 'primary_key' => ['id']]);
             \$table
                 ->addColumn('id', '{$uuidType}', ['null' => false])
-                ->addColumn('entity_table', 'string', ['limit' => 191, 'null' => false])
+                ->addColumn('eav_entity_id', '{$uuidType}', ['null' => false])
                 ->addColumn('{$entityField}', '{$entityFieldType}', ['null' => false])
-                ->addColumn('attribute_id', '{$uuidType}', ['null' => false])
+                ->addColumn('eav_attribute_id', '{$uuidType}', ['null' => false])
                 ->addColumn('value', \$spec['valType'], array_merge(\$spec['valOptions'], ['null' => true]))
                 ->addTimestamps('created', 'modified')
-                ->addIndex(['entity_table', '{$entityField}', 'attribute_id'], ['unique' => true, 'name' => 'idx_' . \$spec['table'] . '_lookup'])
-                ->addForeignKey('attribute_id', 'eav_attributes', 'id', ['delete' => 'CASCADE'])
+                ->addIndex(['eav_entity_id', '{$entityField}', 'eav_attribute_id'], ['unique' => true, 'name' => 'idx_' . \$spec['table'] . '_lookup'])
+                ->addForeignKey('eav_entity_id', 'eav_entities', 'id', ['delete' => 'CASCADE'])
+                ->addForeignKey('eav_attribute_id', 'eav_attributes', 'id', ['delete' => 'CASCADE'])
                 ->create();
         }
     }
@@ -630,7 +631,7 @@ PHP;
         $mapEntityId = function (string $pkType, string $uuidType) use ($mapUuidCol): string {
             return $pkType === 'int' ? 'BIGINT' : $mapUuidCol($uuidType);
         };
-        $mapVarchar = function (int $len = 191) use ($isPg): string {
+        $mapVarchar = function (int $len = 255) use ($isPg): string {
             return 'VARCHAR(' . $len . ')';
         };
         $mapTimestamp = function () use ($isPg, $isMy): string {
@@ -670,17 +671,17 @@ PHP;
             $lines = [];
             $lines[] = "CREATE TABLE IF NOT EXISTS {$table} (";
             $lines[] = "  id {$idCol} NOT NULL,";
-            $lines[] = "  entity_table " . $mapVarchar(191) . " NOT NULL,";
+            $lines[] = "  eav_entity_id {$idCol} NOT NULL,";
             $lines[] = "  entity_id {$entityIdCol} NOT NULL,";
-            $lines[] = "  attribute_id {$idCol} NOT NULL,";
+            $lines[] = "  eav_attribute_id {$idCol} NOT NULL,";
             $lines[] = "  value {$valueType} NULL,";
             $lines[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
             $lines[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
             $lines[] = "  PRIMARY KEY (id)";
             $lines[] = ");";
-            $lines[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_{$table}_lookup ON {$table} (entity_table, entity_id, attribute_id);";
-            // PG add FK with ON DELETE CASCADE; MySQL can do the same
-            $lines[] = "ALTER TABLE {$table} ADD CONSTRAINT fk_{$table}_attribute_id FOREIGN KEY (attribute_id) REFERENCES eav_attributes(id) ON DELETE CASCADE;";
+            $lines[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_{$table}_lookup ON {$table} (eav_entity_id, entity_id, eav_attribute_id);";
+            $lines[] = "ALTER TABLE {$table} ADD CONSTRAINT fk_{$table}_eav_entity_id FOREIGN KEY (eav_entity_id) REFERENCES eav_entities(id) ON DELETE CASCADE;";
+            $lines[] = "ALTER TABLE {$table} ADD CONSTRAINT fk_{$table}_eav_attribute_id FOREIGN KEY (eav_attribute_id) REFERENCES eav_attributes(id) ON DELETE CASCADE;";
             return implode("\n", $lines) . "\n";
         };
 
@@ -689,7 +690,7 @@ PHP;
         $ddl[] = "-- Core attribute registry tables";
         $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attributes (";
         $ddl[] = "  id {$idCol} NOT NULL,";
-        $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
+        $ddl[] = "  name " . $mapVarchar(255) . " NOT NULL,";
         $ddl[] = "  data_type " . $mapVarchar(50) . " NOT NULL,";
         $ddl[] = "  placeholder " . $mapVarchar(255) . " NULL,";
         $ddl[] = "  help_text " . $mapVarchar(255) . " NULL,";
@@ -702,7 +703,7 @@ PHP;
 
         $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attribute_sets (";
         $ddl[] = "  id {$idCol} NOT NULL,";
-        $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
+        $ddl[] = "  name " . $mapVarchar(255) . " NOT NULL,";
         $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  PRIMARY KEY (id)";
@@ -713,11 +714,11 @@ PHP;
         // New: eav_entities registry table
         $ddl[] = "CREATE TABLE IF NOT EXISTS eav_entities (";
         $ddl[] = "  id {$idCol} NOT NULL,";
-        $ddl[] = "  name " . $mapVarchar(191) . " NOT NULL,";
-        $ddl[] = "  model_alias " . $mapVarchar(191) . " NULL,";
-        $ddl[] = "  table_name " . $mapVarchar(191) . " NULL,";
+        $ddl[] = "  name " . $mapVarchar(255) . " NOT NULL,";
+        $ddl[] = "  model_alias " . $mapVarchar(255) . " NULL,";
+        $ddl[] = "  table_name " . $mapVarchar(255) . " NULL,";
         $ddl[] = "  storage_default " . $mapVarchar(20) . " NOT NULL,";
-        $ddl[] = "  json_column " . $mapVarchar(191) . " NULL,";
+        $ddl[] = "  json_column " . $mapVarchar(255) . " NULL,";
         $ddl[] = "  pk_type " . $mapVarchar(10) . " NOT NULL,";
         $ddl[] = "  uuid_subtype " . $mapVarchar(20) . " NULL,";
         $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";

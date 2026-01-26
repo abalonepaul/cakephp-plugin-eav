@@ -11,7 +11,7 @@ class EavJsonFixture extends TestFixture
 
     public array $fields = [
         'id' => ['type' => 'uuid', 'null' => false],
-        'entity_table' => ['type' => 'string', 'length' => 191, 'null' => false],
+        'entity_table' => ['type' => 'string', 'length' => 255, 'null' => false],
         'entity_id' => ['type' => 'uuid', 'null' => false],
         'attribute_id' => ['type' => 'uuid', 'null' => false],
         'value' => ['type' => 'json', 'null' => true],

@@ -56,7 +56,7 @@ class EavBehaviorTest extends TestCase
             $schema = new TableSchema('eav_attributes');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
+                ->addColumn('name', ['type' => 'string', 'length' => 255, 'null' => false])
                 ->addColumn('data_type', ['type' => 'string', 'length' => 50, 'null' => false])
                 ->addColumn('placeholder', ['type' => 'string', 'length' => 255, 'null' => true])
                 ->addColumn('help_text', ['type' => 'string', 'length' => 255, 'null' => true])
@@ -70,7 +70,7 @@ class EavBehaviorTest extends TestCase
             $schema = new TableSchema('eav_string');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('entity_table', ['type' => 'string', 'length' => 191, 'null' => false])
+                ->addColumn('entity_table', ['type' => 'string', 'length' => 255, 'null' => false])
                 ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('value', ['type' => 'string', 'length' => 1024, 'null' => true])
@@ -84,7 +84,7 @@ class EavBehaviorTest extends TestCase
             $schema = new TableSchema('eav_json');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('entity_table', ['type' => 'string', 'length' => 191, 'null' => false])
+                ->addColumn('entity_table', ['type' => 'string', 'length' => 255, 'null' => false])
                 ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('value', ['type' => 'json', 'null' => true])

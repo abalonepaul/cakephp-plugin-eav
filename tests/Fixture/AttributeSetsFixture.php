@@ -11,7 +11,7 @@ class AttributeSetsFixture extends TestFixture
 
     public array $fields = [
         'id' => ['type' => 'uuid', 'null' => false],
-        'name' => ['type' => 'string', 'length' => 191, 'null' => false],
+        'name' => ['type' => 'string', 'length' => 255, 'null' => false],
         'created' => ['type' => 'datetime', 'null' => false],
         'modified' => ['type' => 'datetime', 'null' => false],
         '_constraints' => [

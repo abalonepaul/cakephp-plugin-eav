@@ -29,6 +29,14 @@ class EavSetupCommandTest extends TestCase
         $this->assertOutputContains("->addTimestamps('created', 'modified')");
         $this->assertOutputContains("->addColumn('placeholder'");
         $this->assertOutputContains("->addColumn('help_text'");
+
+        // EAV-28: updated value tables schema
+        $this->assertOutputContains("->addColumn('eav_entity_id'");
+        $this->assertOutputContains("->addColumn('eav_attribute_id'");
+        $this->assertOutputContains("->addForeignKey('eav_entity_id', 'eav_entities', 'id'");
+        $this->assertOutputContains("->addForeignKey('eav_attribute_id', 'eav_attributes', 'id'");
+        $this->assertOutputContains("->addIndex(['eav_entity_id', 'entity_id', 'eav_attribute_id']");
+        $this->assertOutputNotContains("->addColumn('entity_table'");
     }
 
     public function testRawSqlDryRunOnSupportedDrivers(): void
@@ -49,13 +57,21 @@ class EavSetupCommandTest extends TestCase
         $this->assertOutputContains('Dry run - SQL not written.');
         $this->assertOutputContains('EAV Setup SQL');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attributes');
-                $this->assertOutputContains('placeholder');
+        $this->assertOutputContains('placeholder');
         $this->assertOutputContains('help_text');
 
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attribute_sets');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_entities');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attribute_sets_eav_attributes');
+
+        // EAV-28: value tables DDL checks
         $this->assertOutputContains('CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_string_lookup');
+        $this->assertOutputContains('(eav_entity_id, entity_id, eav_attribute_id)');
+        $this->assertOutputContains('FOREIGN KEY (eav_entity_id) REFERENCES eav_entities(id)');
+        $this->assertOutputContains('FOREIGN KEY (eav_attribute_id) REFERENCES eav_attributes(id)');
+        $this->assertOutputContains('eav_entity_id');
+        $this->assertOutputContains('eav_attribute_id');
+        $this->assertOutputNotContains('entity_table');
     }
 
     public function testConfigFileRespectedForOutputModeAndTypes(): void
