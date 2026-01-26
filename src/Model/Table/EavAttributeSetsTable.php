@@ -67,7 +67,7 @@ class EavAttributeSetsTable extends Table
     {
         $validator
             ->scalar('name')
-            ->maxLength('name', 191)
+            ->maxLength('name', 255)
             ->requirePresence('name', 'create')
             ->notEmptyString('name')
             ->add('name', 'unique', ['rule' => 'validateUnique', 'provider' => 'table']);

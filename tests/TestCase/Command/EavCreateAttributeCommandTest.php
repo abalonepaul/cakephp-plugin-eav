@@ -30,7 +30,7 @@ class EavCreateAttributeCommandTest extends TestCase
             $schema = new TableSchema('eav_attributes');
             $schema
                 ->addColumn('id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('name', ['type' => 'string', 'length' => 191, 'null' => false])
+                ->addColumn('name', ['type' => 'string', 'length' => 255, 'null' => false])
                 ->addColumn('data_type', ['type' => 'string', 'length' => 50, 'null' => false])
                 ->addColumn('placeholder', ['type' => 'string', 'length' => 255, 'null' => true])
                 ->addColumn('help_text', ['type' => 'string', 'length' => 255, 'null' => true])
