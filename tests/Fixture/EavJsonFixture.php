@@ -10,15 +10,14 @@ class EavJsonFixture extends TestFixture
     public string $table = 'eav_json';
 
     public array $fields = [
-        'id' => ['type' => 'uuid', 'null' => false],
-        'entity_table' => ['type' => 'string', 'length' => 255, 'null' => false],
+        'eav_entity_id' => ['type' => 'uuid', 'null' => false],
         'entity_id' => ['type' => 'uuid', 'null' => false],
-        'attribute_id' => ['type' => 'uuid', 'null' => false],
+        'eav_attribute_id' => ['type' => 'uuid', 'null' => false],
         'value' => ['type' => 'json', 'null' => true],
         'created' => ['type' => 'datetime', 'null' => false],
         'modified' => ['type' => 'datetime', 'null' => false],
         '_constraints' => [
-            'primary' => ['type' => 'primary', 'columns' => ['id']],
+            'primary' => ['type' => 'primary', 'columns' => ['eav_entity_id', 'entity_id', 'eav_attribute_id']],
         ],
     ];
 
@@ -26,10 +25,9 @@ class EavJsonFixture extends TestFixture
     {
         $this->records = [
             [
-                'id' => 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-                'entity_table' => 'test_entities',
+                'eav_entity_id' => '00000000-0000-0000-0000-000000000001',
                 'entity_id' => '22222222-2222-2222-2222-222222222222',
-                'attribute_id' => '22222222-2222-2222-2222-222222222222',
+                'eav_attribute_id' => '22222222-2222-2222-2222-222222222222',
                 'value' => ['foo' => 'bar'],
                 'created' => '2024-01-01 00:00:00',
                 'modified' => '2024-01-01 00:00:00',

@@ -83,6 +83,9 @@ class EavBehavior extends Behavior
         'integer' => 'int',
     ];
 
+    /** @var array<string,string> Cached eav_entities.id by entityTable name */
+    protected array $eavEntityIdCache = [];
+
     /**
      * Capture mapped values from request data for later persistence.
      *
@@ -434,6 +437,7 @@ class EavBehavior extends Behavior
         $rootPk = (string)current((array)$table->getPrimaryKey());
         $entityField = $this->entityIdField();
         $entityTableName = (string)$this->getConfig('entityTable');
+        $eavEntityId = $this->resolveEavEntityId();
 
         // Early expression-tree WHERE rewriting for Tables storage BEFORE any projections/joins from select/order logic.
         // This avoids leaking attribute aliases (e.g., "color") into WHERE as base columns.
@@ -501,8 +505,8 @@ class EavBehavior extends Behavior
                         [$alias => $tableName],
                         [
                             "{$alias}.{$entityField} = {$rootAlias}.{$rootPk}",
-                            "{$alias}.entity_table" => $entityTableName,
-                            "{$alias}.attribute_id" => $attrId,
+                            "{$alias}.eav_entity_id" => $eavEntityId,
+                            "{$alias}.eav_attribute_id" => $attrId,
                         ]
                     );
                     $joinedAliases[$alias] = true;
@@ -607,14 +611,14 @@ class EavBehavior extends Behavior
             $alias = 'EAV_' . $safeAttr . '_' . $safeType;
             $tableName = 'eav_' . strtolower((string)$resolvedType);
 
-            // LEFT JOIN to preserve rows without the attribute
+            // LEFT JOIN to preserve rows without the attribute (EAV-28/29 composite keys)
             if (!isset($joinedAliases[$alias])) {
                 $query->leftJoin(
                     [$alias => $tableName],
                     [
                         "{$alias}.{$entityField} = {$rootAlias}.{$rootPk}",
-                        "{$alias}.entity_table" => $entityTableName,
-                        "{$alias}.attribute_id" => $attrId,
+                        "{$alias}.eav_entity_id" => $eavEntityId,
+                        "{$alias}.eav_attribute_id" => $attrId,
                     ]
                 );
                 $joinedAliases[$alias] = true;
@@ -739,8 +743,8 @@ class EavBehavior extends Behavior
                         [$alias => $tableName],
                         [
                             "{$alias}.{$entityField} = {$rootAlias}.{$rootPk}",
-                            "{$alias}.entity_table" => $entityTableName,
-                            "{$alias}.attribute_id" => $attrId,
+                            "{$alias}.eav_entity_id" => $eavEntityId,
+                            "{$alias}.eav_attribute_id" => $attrId,
                         ]
                     );
                     $joinedAliases[$alias] = true;
@@ -909,8 +913,8 @@ class EavBehavior extends Behavior
                                 [$alias => $tableName],
                                 [
                                     "{$alias}.{$entityField} = {$rootAlias}.{$rootPk}",
-                                    "{$alias}.entity_table" => $entityTableName,
-                                    "{$alias}.attribute_id" => $attrId,
+                                    "{$alias}.eav_entity_id" => $eavEntityId,
+                                    "{$alias}.eav_attribute_id" => $attrId,
                                 ]
                             );
                             $joinedAliases[$alias] = true;
@@ -1005,8 +1009,8 @@ class EavBehavior extends Behavior
                             [$alias => $tableName],
                             [
                                 "{$alias}.{$entityField} = {$rootAlias}.{$rootPk}",
-                                "{$alias}.entity_table" => $entityTableName,
-                                "{$alias}.attribute_id" => $attrId,
+                                "{$alias}.eav_entity_id" => $eavEntityId,
+                                "{$alias}.eav_attribute_id" => $attrId,
                             ]
                         );
                         $joinedAliases[$alias] = true;
@@ -1078,6 +1082,7 @@ class EavBehavior extends Behavior
             $rootPk = (string)current((array)$table->getPrimaryKey());
             $entityField = $this->entityIdField();
             $entityTableName = (string)$this->getConfig('entityTable');
+            $eavEntityId = $this->resolveEavEntityId();
 
             foreach ($rawConds as $key => $value) {
                 // Keep non-string keys (expressions) as-is
@@ -1183,8 +1188,8 @@ class EavBehavior extends Behavior
                         [$alias => $tableName],
                         [
                             "{$alias}.{$entityField} = {$rootAlias}.{$rootPk}",
-                            "{$alias}.entity_table" => $entityTableName,
-                            "{$alias}.attribute_id" => $attrId,
+                            "{$alias}.eav_entity_id" => $eavEntityId,
+                            "{$alias}.eav_attribute_id" => $attrId,
                         ]
                     );
                     $joinedAliases[$alias] = true;
@@ -1331,6 +1336,8 @@ class EavBehavior extends Behavior
         string $entityTableName
     ): ?QueryExpression {
         $driver = $query->getConnection()->getDriver();
+        // EAV-28/29: resolve registry FK once; use composite key in joins
+        $eavEntityId = $this->resolveEavEntityId();
 
         // Helper: resolve attribute type from overrides/map/registry/inference
         $resolveType = function (string $field, mixed $value) use ($overrideTypes, $map) {
@@ -1366,7 +1373,7 @@ class EavBehavior extends Behavior
         };
 
         // Helper: ensure a join exists for this attribute/type and return alias + whether it was left-joined
-        $ensureJoin = function (string $field, string $type, string $op, ?string &$alias, ?string &$tableName, ?string &$attrId) use (&$joinedAliases, $query, $entityField, $entityTableName, $rootAlias, $rootPk) {
+        $ensureJoin = function (string $field, string $type, string $op, ?string &$alias, ?string &$tableName, ?string &$attrId) use (&$joinedAliases, $query, $entityField, $rootAlias, $rootPk, $eavEntityId) {
             $safeAttr = preg_replace('/[^a-z0-9_]+/i', '_', strtolower($field));
             $safeType = preg_replace('/[^a-z0-9_]+/i', '_', strtolower($type));
             $alias = 'EAV_' . $safeAttr . '_' . $safeType;
@@ -1399,8 +1406,8 @@ class EavBehavior extends Behavior
                     [$alias => $tableName],
                     [
                         "{$alias}.{$entityField} = {$rootAlias}.{$rootPk}",
-                        "{$alias}.entity_table" => $entityTableName,
-                        "{$alias}.attribute_id" => $attrId,
+                        "{$alias}.eav_entity_id" => $eavEntityId,
+                        "{$alias}.eav_attribute_id" => $attrId,
                     ]
                 );
                 $joinedAliases[$alias] = true;
@@ -1862,6 +1869,9 @@ class EavBehavior extends Behavior
     /**
      * Get AV table instance for a type and storage.
      *
+     * Always returns a generic Table bound to the concrete eav_<type> table to avoid
+     * legacy validations/rules in model classes (entity_table/attribute_id) during composite-key writes.
+     *
      * @param string $type Normalized type.
      * @param string|null $storage JSON storage.
      * @return \Cake\ORM\Table
@@ -1870,11 +1880,6 @@ class EavBehavior extends Behavior
     {
         // Try canonical class first; if missing, fall back to a generic Table with explicit eav_<type> name.
         $segment = $this->tableTypeSegment($type, $storage);
-        $fqcn = 'Eav\\Model\\Table\\Eav' . $segment . 'Table';
-        if (class_exists($fqcn)) {
-            return $this->getTableLocator()->get($this->avTableClass($type, $storage));
-        }
-
         $tableName = 'eav_' . strtolower($type);
         $alias = 'EavDynamic' . $segment;
 
@@ -1901,23 +1906,33 @@ class EavBehavior extends Behavior
         $tbl = $this->tableFor($normalized['type'], $normalized['storage']);
         $value = $this->castValueForType($normalized['type'], $val);
         $entityField = $this->entityIdField();
-        $data = [
-            'entity_table' => (string)$this->getConfig('entityTable'),
-            $entityField => $entityId,
-            'attribute_id' => $attrId,
-            'value' => $value,
-        ];
+
+        // EAV-28/29: use eav_entity_id + eav_attribute_id + entity_id (composite key)
+        $eavEntityId = $this->resolveEavEntityId();
+
         $row = $tbl->find()
             ->where([
-                'entity_table' => $data['entity_table'],
-                'attribute_id' => $attrId,
+                'eav_entity_id' => $eavEntityId,
+                'eav_attribute_id' => $attrId,
                 $entityField => $entityId,
             ])
             ->first();
+
         if ($row) {
-            $tbl->patchEntity($row, ['value' => $value]);
+            $tbl->patchEntity($row, [
+                'value' => $value,
+                'modified' => DateTime::now(),
+            ]);
         } else {
-            $row = $tbl->newEntity($data);
+            $now = DateTime::now();
+            $row = $tbl->newEntity([
+                'eav_entity_id' => $eavEntityId,
+                $entityField => $entityId,
+                'eav_attribute_id' => $attrId,
+                'value' => $value,
+                'created' => $now,
+                'modified' => $now,
+            ]);
         }
         try {
             $tbl->saveOrFail($row);
@@ -1925,7 +1940,7 @@ class EavBehavior extends Behavior
             throw new RuntimeException(
                 sprintf('Failed to save EAV value for %s:%s', $attributeName, (string)$entityId),
                 0,
-                $e,
+                $e
             );
         }
     }
@@ -1952,12 +1967,13 @@ class EavBehavior extends Behavior
         $attributeIds = [];
         foreach ($byType as $normalized) {
             $tbl = $this->tableFor($normalized['type'], $normalized['storage']);
+            $eavEntityId = $this->resolveEavEntityId();
             $rows = $tbl->find()
-                ->where(['entity_table' => (string)$this->getConfig('entityTable')])
+                ->where(['eav_entity_id' => $eavEntityId])
                 ->where([$entityField . ' IN' => $ids])
                 ->all();
             foreach ($rows as $r) {
-                $attrId = (string)$r->get('attribute_id');
+                $attrId = (string)$r->get('eav_attribute_id');
                 $rawRows[] = [
                     'entity_id' => (string)$r->get($entityField),
                     'attribute_id' => $attrId,
@@ -2014,13 +2030,16 @@ class EavBehavior extends Behavior
             throw new InvalidArgumentException(sprintf('Unsupported operator "%s".', $op));
         }
 
+        // EAV-28/29: join on composite key parts (eav_entity_id, eav_attribute_id) and entity_id
+        $eavEntityId = $this->resolveEavEntityId();
+
         $query->innerJoin(
             [$alias => $table],
             [
                 "{$alias}.{$entityField} = {$root}.{$rootPk}",
-                "{$alias}.entity_table" => (string)$this->getConfig('entityTable'),
-                "{$alias}.attribute_id" => $attrId,
-            ],
+                "{$alias}.eav_entity_id" => $eavEntityId,
+                "{$alias}.eav_attribute_id" => $attrId,
+            ]
         );
 
         if ($op === 'IN') {
@@ -2233,6 +2252,60 @@ class EavBehavior extends Behavior
     protected function pkSuffix(): string
     {
         return $this->getConfig('pkType') === 'int' ? 'Int' : 'Uuid';
+    }
+
+    /**
+     * Resolve the eav_entities.id for the configured entityTable.
+     * Caches per behavior instance to avoid repeated lookups during a request.
+     *
+     * @return string UUID of the EAV entity registry row.
+     */
+    protected function resolveEavEntityId(): string
+    {
+        $entityTableName = (string)$this->getConfig('entityTable');
+        if ($entityTableName === '') {
+            throw new RuntimeException('EavBehavior: entityTable must be configured to resolve eav_entity_id.');
+        }
+
+        if (isset($this->eavEntityIdCache[$entityTableName])) {
+            return $this->eavEntityIdCache[$entityTableName];
+        }
+
+        try {
+            $Entities = $this->getTableLocator()->get('Eav.EavEntities');
+            $row = $Entities->find()
+                ->select(['id'])
+                ->where(['name' => $entityTableName])
+                ->enableHydration(false)
+                ->first();
+
+            if (!$row) {
+                // Fallback to table_name match if name isn't populated
+                $row = $Entities->find()
+                    ->select(['id'])
+                    ->where(['table_name' => $entityTableName])
+                    ->enableHydration(false)
+                    ->first();
+            }
+
+            if (!$row || !isset($row['id'])) {
+                throw new RuntimeException(sprintf(
+                    'EavBehavior: No eav_entities row found for "%s". Seed eav_entities first.',
+                    $entityTableName
+                ));
+            }
+
+            $id = (string)$row['id'];
+            $this->eavEntityIdCache[$entityTableName] = $id;
+            return $id;
+        } catch (\Throwable $e) {
+            // Surface a clear message for tests/environments missing the registry
+            throw new RuntimeException(
+                sprintf('EavBehavior: Failed to resolve eav_entity_id for "%s": %s', $entityTableName, $e->getMessage()),
+                0,
+                $e
+            );
+        }
     }
 
     /**

@@ -40,6 +40,7 @@ class EavBehaviorTest extends TestCase
 {
     protected array $fixtures = [
         'plugin.Eav.EavAttributes',
+        'plugin.Eav.EavEntities',
         'plugin.Eav.EavString',
         'plugin.Eav.EavJson',
     ];
@@ -69,28 +70,26 @@ class EavBehaviorTest extends TestCase
         if (!in_array('eav_string', $existing, true)) {
             $schema = new TableSchema('eav_string');
             $schema
-                ->addColumn('id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('entity_table', ['type' => 'string', 'length' => 255, 'null' => false])
+                ->addColumn('eav_entity_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
+                ->addColumn('eav_attribute_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('value', ['type' => 'string', 'length' => 1024, 'null' => true])
                 ->addColumn('created', ['type' => 'datetime', 'null' => false])
                 ->addColumn('modified', ['type' => 'datetime', 'null' => false])
-                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
+                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['eav_entity_id', 'entity_id', 'eav_attribute_id']]);
             $definitions[] = $schema;
         }
 
         if (!in_array('eav_json', $existing, true)) {
             $schema = new TableSchema('eav_json');
             $schema
-                ->addColumn('id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('entity_table', ['type' => 'string', 'length' => 255, 'null' => false])
+                ->addColumn('eav_entity_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('entity_id', ['type' => 'uuid', 'null' => false])
-                ->addColumn('attribute_id', ['type' => 'uuid', 'null' => false])
+                ->addColumn('eav_attribute_id', ['type' => 'uuid', 'null' => false])
                 ->addColumn('value', ['type' => 'json', 'null' => true])
                 ->addColumn('created', ['type' => 'datetime', 'null' => false])
                 ->addColumn('modified', ['type' => 'datetime', 'null' => false])
-                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['id']]);
+                ->addConstraint('primary', ['type' => 'primary', 'columns' => ['eav_entity_id', 'entity_id', 'eav_attribute_id']]);
             $definitions[] = $schema;
         }
 
