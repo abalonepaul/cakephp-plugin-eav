@@ -30,12 +30,15 @@ class EavSetupCommandTest extends TestCase
         $this->assertOutputContains("->addColumn('placeholder'");
         $this->assertOutputContains("->addColumn('help_text'");
 
-        // EAV-28: updated value tables schema
+        // EAV-29: value tables schema (composite PK, no unique index)
         $this->assertOutputContains("->addColumn('eav_entity_id'");
         $this->assertOutputContains("->addColumn('eav_attribute_id'");
         $this->assertOutputContains("->addForeignKey('eav_entity_id', 'eav_entities', 'id'");
         $this->assertOutputContains("->addForeignKey('eav_attribute_id', 'eav_attributes', 'id'");
-        $this->assertOutputContains("->addIndex(['eav_entity_id', 'entity_id', 'eav_attribute_id']");
+        // Composite primary key present
+        $this->assertOutputContains("'primary_key' => ['eav_entity_id', 'entity_id', 'eav_attribute_id']");
+        // No separate unique index on lookup columns under EAV-29
+        $this->assertOutputNotContains("->addIndex(['eav_entity_id', 'entity_id', 'eav_attribute_id']");
         $this->assertOutputNotContains("->addColumn('entity_table'");
     }
 
@@ -64,13 +67,13 @@ class EavSetupCommandTest extends TestCase
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_entities');
         $this->assertOutputContains('CREATE TABLE IF NOT EXISTS eav_attribute_sets_eav_attributes');
 
-        // EAV-28: value tables DDL checks
-        $this->assertOutputContains('CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_string_lookup');
-        $this->assertOutputContains('(eav_entity_id, entity_id, eav_attribute_id)');
+        // EAV-29: value tables DDL checks (composite PK; no unique index)
+        $this->assertOutputContains('PRIMARY KEY (eav_entity_id, entity_id, eav_attribute_id)');
         $this->assertOutputContains('FOREIGN KEY (eav_entity_id) REFERENCES eav_entities(id)');
         $this->assertOutputContains('FOREIGN KEY (eav_attribute_id) REFERENCES eav_attributes(id)');
         $this->assertOutputContains('eav_entity_id');
         $this->assertOutputContains('eav_attribute_id');
+        $this->assertOutputNotContains('CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_string_lookup');
         $this->assertOutputNotContains('entity_table');
     }
 

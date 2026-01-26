@@ -10,6 +10,24 @@ use Cake\TestSuite\Fixture\TestFixture;
  */
 class EavEntitiesFixture extends TestFixture
 {
+    public string $table = 'eav_entities';
+
+    public array $fields = [
+        'id' => ['type' => 'uuid', 'null' => false],
+        'name' => ['type' => 'string', 'length' => 255, 'null' => false],
+        'model_alias' => ['type' => 'string', 'length' => 255, 'null' => true],
+        'table_name' => ['type' => 'string', 'length' => 255, 'null' => true],
+        'storage_default' => ['type' => 'string', 'length' => 20, 'null' => false, 'default' => 'tables'],
+        'json_column' => ['type' => 'string', 'length' => 255, 'null' => true],
+        'pk_type' => ['type' => 'string', 'length' => 10, 'null' => false, 'default' => 'uuid'],
+        'uuid_subtype' => ['type' => 'string', 'length' => 20, 'null' => true],
+        'created' => ['type' => 'datetime', 'null' => false],
+        'modified' => ['type' => 'datetime', 'null' => false],
+        '_constraints' => [
+            'primary' => ['type' => 'primary', 'columns' => ['id']],
+        ],
+    ];
+
     /**
      * Init method
      *
@@ -18,17 +36,31 @@ class EavEntitiesFixture extends TestFixture
     public function init(): void
     {
         $this->records = [
+            // Registry entry for tables using entityTable = 'test_entities'
             [
-                'id' => '19dac9a9-3cf7-4e92-9452-98782800e735',
-                'name' => 'Lorem ipsum dolor sit amet',
-                'model_alias' => 'Lorem ipsum dolor sit amet',
-                'table_name' => 'Lorem ipsum dolor sit amet',
-                'storage_default' => 'Lorem ipsum dolor ',
-                'json_column' => 'Lorem ipsum dolor sit amet',
-                'pk_type' => 'Lorem ip',
-                'uuid_subtype' => 'Lorem ipsum dolor ',
-                'created' => 1766960673,
-                'modified' => 1766960673,
+                'id' => '00000000-0000-0000-0000-000000000001',
+                'name' => 'test_entities',
+                'model_alias' => null,
+                'table_name' => 'test_entities',
+                'storage_default' => 'tables',
+                'json_column' => null,
+                'pk_type' => 'uuid',
+                'uuid_subtype' => 'uuid',
+                'created' => '2024-01-01 00:00:00',
+                'modified' => '2024-01-01 00:00:00',
+            ],
+            // Registry entry for migrator tests using entityTable = 'json_entities'
+            [
+                'id' => '00000000-0000-0000-0000-000000000002',
+                'name' => 'json_entities',
+                'model_alias' => null,
+                'table_name' => 'json_entities',
+                'storage_default' => 'tables',
+                'json_column' => null,
+                'pk_type' => 'uuid',
+                'uuid_subtype' => 'uuid',
+                'created' => '2024-01-01 00:00:00',
+                'modified' => '2024-01-01 00:00:00',
             ],
         ];
         parent::init();

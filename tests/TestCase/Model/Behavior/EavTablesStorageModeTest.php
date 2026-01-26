@@ -15,8 +15,9 @@ class EavTablesStorageModeTest extends TestCase
 {
     protected array $fixtures = [
         'plugin.Eav.EavAttributes',
+        'plugin.Eav.EavEntities',
         'plugin.Eav.EavString',
-        'plugin.Eav.TestEntities',
+        'plugin.Eav.EavJson',
     ];
 
     public static function setUpBeforeClass(): void
@@ -51,6 +52,13 @@ class EavTablesStorageModeTest extends TestCase
             'table' => 'test_entities',
         ]);
         $this->Entities->setPrimaryKey('id');
+
+        // Seed base rows so EAV joins have left-side entities to match
+        $conn = \Cake\Datasource\ConnectionManager::get('test');
+        // Truncate to ensure deterministic content across tests
+        $conn->execute('TRUNCATE test_entities');
+        $conn->execute("INSERT INTO test_entities (id) VALUES ('22222222-2222-2222-2222-222222222222')");
+        $conn->execute("INSERT INTO test_entities (id) VALUES ('33333333-3333-3333-3333-333333333333')");
 
         // Attach behavior in tables storage mode; no explicit map required for rewriting
         $this->Entities->addBehavior('Eav.Eav', [
@@ -127,9 +135,9 @@ class EavTablesStorageModeTest extends TestCase
         $EavString = TableRegistry::getTableLocator()->get('Eav.EavString');
         $row = $EavString->find()
             ->where([
-                'entity_table' => 'test_entities',
+                'eav_entity_id' => '00000000-0000-0000-0000-000000000001', // test_entities
                 'entity_id' => $newId,
-                'attribute_id' => $colorAttr['id'],
+                'eav_attribute_id' => $colorAttr['id'],
             ])
             ->first();
 
