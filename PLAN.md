@@ -1282,6 +1282,68 @@ Driver-based UUID recommendations (used in Setup)
 - SQL Server: nativeuuid (Recommended)
 - SQLite: uuid (string) (Recommended)
 
+### Feature 10/EAV-2 — Documentation (Completed Summary)
+
+Overview
+- Created comprehensive developer documentation and modernized the README for the CakePHP 5.2 EAV plugin.
+- Ensured all examples reflect implemented features (Features 1–10 and resolved issues), using Contacts/Products as neutral examples and avoiding project-specific names.
+
+What changed
+- New documentation
+    - Added DOCUMENTATION.md with detailed guidance on:
+        - Installation requirements and plugin loading
+        - Data Types (defaults and TypeFactory coverage; unified custom fk type)
+        - PK Types (uuid|int and driver-aware uuid subtypes)
+        - Setup Commands (interactive wizard and non-interactive flags; migrations and raw SQL)
+        - Admin Routing (default /eav scope and how to mount under /admin)
+        - Operation (storage modes: tables default, json_column Postgres-only; query rewrite; typed hydration; save behavior)
+        - Configuring Entities (eav_entities registry)
+        - Creating Attributes (UI and CLI, flags-only command)
+        - Attribute Sets (CRUD and delete guardrail)
+        - Data Migrations (JSON→EAV implemented; Native→EAV and Native→JSON marked “Coming Soon”)
+        - Postgres indexing guidance (GIN and functional indexes) for JSON Storage Mode
+    - Clarified JSON Attribute vs JSON Storage:
+        - “JSON Attribute storage for eav_json.value” controls json|jsonb column type (wizard).
+        - Added explicit note that this setting is not JSON Storage Mode; no non-interactive JSON flags shown beyond this.
+- README rewrite
+    - Replaced legacy 2.x copy with a concise overview that includes:
+        - EAV description and history
+        - Implemented features list (storage modes, query rewriting, admin UI, setup, data types, PKs, commands, migrations)
+        - Suggested usage examples (Contacts in tables mode, Products in JSON Storage Mode)
+        - Quickstart (interactive setup, non-interactive migrations, behavior attach, create attribute, JSON→EAV)
+        - Link to DOCUMENTATION.md for full details
+- Command examples adjusted
+    - Removed --json-storage json from all non-interactive examples in README and DOCUMENTATION.
+    - Retained a wizard bullet that mentions JSON Attribute storage selection and clarifies the scope (JSON Attribute only).
+- Alignment with current code
+    - Storage defaults to tables; JSON Storage Mode is optional and Postgres-only.
+    - Behavior config uses the single attributes key (no map/attributeTypeMap).
+    - Value tables described with composite PK (eav_entity_id, entity_id, eav_attribute_id), FKs, and nullable value.
+    - Migrations extend Migrations\BaseMigration.
+    - Admin routing documented as app-level mount for /admin.
+
+Why this change
+- Provide accurate, up-to-date documentation aligned with the CakePHP 5 implementation, reduce confusion between JSON Attribute and JSON Storage, and give a clear on-ramp (setup + UI + behavior usage).
+
+Acceptance criteria met
+- README sells the plugin (description, history, features), includes suggested usage, quickstart, and links to full docs: Yes.
+- DOCUMENTATION includes Installation, Data Types, PK Types, Interactive Setup, Standard Setup, Migrations/Raw SQL, Admin Routing, Operation, Configuring/Creating Entities, Creating Attributes, Create Attribute command, Attribute Sets, and Data Migrations (JSON→EAV implemented; Native→EAV and Native→JSON “Coming Soon”): Yes.
+- Non-interactive examples omit --json-storage; wizard bullet clarifies JSON Attribute vs JSON Storage distinction: Yes.
+- Behavior configuration uses attributes only; storage default is tables; JSON Storage is optional and Postgres-only: Yes.
+- Value tables and migrations correctly documented (composite PK, BaseMigration): Yes.
+- Admin routing is documented as an app-level mount under /admin (example provided): Yes.
+
+Files added/modified
+- Added
+    - plugins/Eav/DOCUMENTATION.md
+- Modified
+    - plugins/Eav/README.md
+
+Notes
+- Examples use Contacts/Products; no organization-specific references included.
+- JetBrains-friendly file links are provided to Behavior, Commands, and Plugin bootstrap where relevant.
+- Future migration commands (Native→EAV, Native→JSON) are labeled “Coming Soon” without CLI syntax.
+
 ## Feature 11 — Interactive Setup Command Service (Convert Feature 4 to a Service)
 
 Architecture (Exploratory; multiple competing approaches)
