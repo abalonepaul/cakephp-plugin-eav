@@ -16,3 +16,5 @@ AGENTS-VSCode.md
 /ISSUES_TO_RESOLVE.md
 /MASTER_PLAN_CHAT_SUMMARY.md
 /config/Migrations/20260125080436_eav_setup.php
+/config/Migrations/20260126060416_eav29_eav_setup_test.php
+/config/Migrations/20260126060152_eav29_eav_setup.php

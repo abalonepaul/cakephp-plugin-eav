@@ -60,7 +60,19 @@ class EavAttributeSetsTableTest extends TestCase
      */
     public function testValidationDefault(): void
     {
-        $this->markTestIncomplete('Not implemented yet.');
+        // Blank name invalid
+        $bad = $this->EavAttributeSets->newEntity(['name' => '']);
+        $this->assertNotEmpty($bad->getErrors());
+
+        // Too long name invalid
+        $long = str_repeat('a', 300);
+        $bad2 = $this->EavAttributeSets->newEntity(['name' => $long]);
+        $this->assertNotEmpty($bad2->getErrors());
+
+        // Valid
+        $ok = $this->EavAttributeSets->newEntity(['name' => 'Valid Set']);
+        $this->assertEmpty($ok->getErrors());
+        $this->assertNotFalse($this->EavAttributeSets->save($ok));
     }
 
     /**
@@ -71,6 +83,9 @@ class EavAttributeSetsTableTest extends TestCase
      */
     public function testBuildRules(): void
     {
-        $this->markTestIncomplete('Not implemented yet.');
+        // Duplicate name should fail unique rule
+        $dup = $this->EavAttributeSets->newEntity(['name' => 'Lorem ipsum dolor sit amet']);
+        $this->assertFalse($this->EavAttributeSets->save($dup));
+        $this->assertNotEmpty($dup->getErrors());
     }
 }

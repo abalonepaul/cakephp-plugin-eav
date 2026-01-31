@@ -3,12 +3,13 @@ declare(strict_types=1);
 
 namespace Eav\Model\Table;
 
+use Cake\ORM\Behavior\TimestampBehavior;
 use Cake\ORM\Table;
 
 /**
- * @mixin \Cake\ORM\Behavior\TimestampBehavior
+ * @mixin TimestampBehavior
  *
- * @extends \Cake\ORM\Table<array{Timestamp: \Cake\ORM\Behavior\TimestampBehavior}>
+ * @extends Table<array{Timestamp: TimestampBehavior}>
  */
 class EavJsonTable extends Table
 {

@@ -213,6 +213,17 @@ class EavBehavior extends Behavior
 
         // Per-query toggle (defaults to true)
         $opts = (array)$query->getOptions();
+        //debug($opts);
+        //debug($options);
+        //Added for Unit Testing. Investigate this for EAV-35 Still not being tested properly
+        if (isset($opts['options']['conditions'])) {
+            $options['conditions'] = $opts['options']['conditions'];
+        }
+        //This helped the tests and is now mostly covered.
+        if (isset($opts['options']['order'])) {
+            $options['order'] = $opts['options']['order'];
+        }
+        //debug($options);
         $eavRewrite = (bool)($opts['eavRewrite'] ?? true);
         if ($eavRewrite === false) {
             return;
@@ -321,15 +332,31 @@ class EavBehavior extends Behavior
             }
 
             // WHERE rewriting (flat array conditions)
+            //Still not getting tested Addressing in EAV-35
             if (isset($options['conditions']) && is_array($options['conditions'])) {
-                $rawConds = (array)$options['conditions'];
+                $rawConds = $options['conditions'];
                 $remaining = [];
 
                 foreach ($rawConds as $key => $value) {
+                    // Handle numeric-key string conditions like "color IS NOT NULL" / "color IS NULL"
                     if (!is_string($key) || $key === '') {
+                        if (is_string($value)) {
+                            if (preg_match('/^\s*([a-zA-Z0-9_]+)\s+(IS NOT NULL|IS NULL)\s*$/i', $value, $mm)) {
+                                $field = trim((string)$mm[1]);
+                                $op = strtoupper((string)$mm[2]);
+                                // Skip native/qualified fields
+                                if ($field !== '' && !str_contains($field, '.') && !isset($nativeColumns[$field])) {
+                                    $hintType = $overrideTypes[$field] ?? $configuredTypes[$field] ?? null;
+                                    $fragment = $this->buildWhereFragment($query, $field, $op, null, $hintType);
+                                    $this->applyWhere($query, $fragment, 'AND');
+                                    continue; // do not carry forward original string condition
+                                }
+                            }
+                        }
                         $remaining[$key] = $value;
                         continue;
                     }
+
                     $upperKey = strtoupper($key);
                     if ($upperKey === 'OR' || $upperKey === 'AND') {
                         $remaining[$key] = $value;
@@ -338,7 +365,8 @@ class EavBehavior extends Behavior
 
                     $field = $key;
                     $op = '=';
-                    if (preg_match('/^(.+?)\s+(=|!=|>=|<=|>|<|IN|NOT IN|LIKE|ILIKE|IS|IS NOT)$/i', $key, $m)) {
+                    // Ensure IS NOT comes before IS to avoid swallowing "NOT"
+                    if (preg_match('/^(.+?)\s+(=|!=|>=|<=|>|<|IN|NOT IN|LIKE|ILIKE|IS NOT|IS|IS NOT NULL)$/i', $key, $m)) {
                         $field = (string)$m[1];
                         $op = strtoupper((string)$m[2]);
                     }
@@ -364,6 +392,19 @@ class EavBehavior extends Behavior
                 }
 
                 $options['conditions'] = $remaining;
+            // Also handle string conditions like "color IS NOT NULL"
+            } elseif (isset($options['conditions']) && is_string($options['conditions'])) {
+                $condStr = trim((string)$options['conditions']);
+                if (preg_match('/^\s*([a-zA-Z0-9_]+)\s+(IS NOT NULL|IS NULL)\s*$/i', $condStr, $mm)) {
+                    $field = trim((string)$mm[1]);
+                    $op = strtoupper((string)$mm[2]);
+                    if ($field !== '' && !str_contains($field, '.') && !isset($nativeColumns[$field])) {
+                        $hintType = $overrideTypes[$field] ?? $configuredTypes[$field] ?? null;
+                        $fragment = $this->buildWhereFragment($query, $field, $op, null, $hintType);
+                        $this->applyWhere($query, $fragment, 'AND');
+                        $options['conditions'] = [];
+                    }
+                }
             }
 
             // Expression-tree WHERE rewriting (via ->where([...])) re-enabled for JSON mode.
@@ -1099,7 +1140,7 @@ class EavBehavior extends Behavior
                 // Parse operator
                 $field = $key;
                 $op = '=';
-                if (preg_match('/^(.+?)\s+(=|!=|>=|<=|>|<|IN|NOT IN|LIKE|ILIKE|IS|IS NOT)$/i', $key, $m)) {
+                if (preg_match('/^(.+?)\s+(=|!=|>=|<=|>|<|IN|NOT IN|LIKE|ILIKE|IS NOT|IS|IS NOT NULL)$/i', $key, $m)) {
                     $field = (string)$m[1];
                     $op = strtoupper((string)$m[2]);
                 }
@@ -1278,6 +1319,111 @@ class EavBehavior extends Behavior
 
             // Preserve only non-attribute/native-safe conditions in options
             $options['conditions'] = $remaining ?? [];
+        // Also handle string conditions like "color IS NOT NULL"
+        } elseif (isset($options['conditions']) && is_string($options['conditions'])) {
+            $driver = $query->getConnection()->getDriver();
+            $condStr = trim((string)$options['conditions']);
+            if (preg_match('/^\s*([a-zA-Z0-9_]+)\s+(IS NOT NULL|IS NULL)\s*$/i', $condStr, $mm)) {
+                $field = trim((string)$mm[1]);
+                $op = strtoupper((string)$mm[2]);
+
+                // Guard native/qualified
+                if ($field !== '' && !str_contains($field, '.') && !isset($nativeColumns[$field])) {
+                    // Resolve type
+                    $resolvedType = null;
+                    if (isset($overrideTypes[$field]) && is_string($overrideTypes[$field])) {
+                        $resolvedType = strtolower((string)$overrideTypes[$field]);
+                    } elseif (isset($map[$field]['type'])) {
+                        $resolvedType = strtolower((string)$map[$field]['type']);
+                    } else {
+                        try {
+                            $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
+                            $row = $Attributes->find()->select(['data_type'])->where(['name' => $field])->enableHydration(false)->first();
+                            if ($row && isset($row['data_type'])) {
+                                $resolvedType = strtolower((string)$row['data_type']);
+                            }
+                        } catch (\Throwable) {
+                            // ignore lookup errors
+                        }
+                        if ($resolvedType === null) {
+                            $resolvedType = 'string';
+                        }
+                    }
+
+                    // Resolve attr id
+                    $attrId = null;
+                    try {
+                        $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
+                        $attrRow = $Attributes->find()->select(['id'])->where(['name' => $field])->enableHydration(false)->first();
+                        if ($attrRow && isset($attrRow['id'])) {
+                            $attrId = (string)$attrRow['id'];
+                        }
+                    } catch (\Throwable) {
+                        // ignore lookup errors
+                    }
+                    if ($attrId === null) {
+                        if ($op !== 'IS NULL') {
+                            $query->where($query->newExpr('0=1'));
+                        }
+                        // else keep original
+                        $options['conditions'] = [];
+                        return;
+                    }
+
+                    $safeAttr = preg_replace('/[^a-z0-9_]+/i', '_', strtolower($field));
+                    $safeType = preg_replace('/[^a-z0-9_]+/i', '_', strtolower((string)$resolvedType));
+                    $alias = 'EAV_' . $safeAttr . '_' . $safeType;
+                    $tableName = 'eav_' . strtolower((string)$resolvedType);
+
+                    $rootAlias = $table->getAlias();
+                    $rootPk = (string)current((array)$table->getPrimaryKey());
+                    $entityField = $this->entityIdField();
+                    $eavEntityId = $this->resolveEavEntityId();
+
+                    $joinMethod = ($op === 'IS NULL') ? 'leftJoin' : 'innerJoin';
+                    if (!isset($joinedAliases[$alias])) {
+                        $query->{$joinMethod}(
+                            [$alias => $tableName],
+                            [
+                                "{$alias}.{$entityField} = {$rootAlias}.{$rootPk}",
+                                "{$alias}.eav_entity_id" => $eavEntityId,
+                                "{$alias}.eav_attribute_id" => $attrId,
+                            ]
+                        );
+                        $joinedAliases[$alias] = true;
+                    }
+
+                    if ($op === 'IS NULL') {
+                        $query->where(["{$alias}.value IS" => null]);
+                    } else {
+                        $query->where(["{$alias}.value IS NOT" => null]);
+                    }
+
+                    if (!isset($projected[$field])) {
+                        $query->select([$field => $query->newExpr("{$alias}.value")]);
+                        $normalized = strtolower((string)$resolvedType);
+                        switch ($normalized) {
+                            case 'smallinteger':
+                            case 'tinyinteger':
+                            case 'biginteger':
+                                $normalized = 'integer';
+                                break;
+                            case 'datetimefractional':
+                            case 'timestamp':
+                            case 'timestampfractional':
+                            case 'timestamptimezone':
+                                $normalized = 'datetime';
+                                break;
+                            default:
+                                break;
+                        }
+                        $selectTypes[$field] = $normalized;
+                        $projected[$field] = true;
+                    }
+
+                    $options['conditions'] = [];
+                }
+            }
         }
 
         // Expression-tree WHERE rewriting for conditions added via ->where([...]) and grouped logic (AND/OR).
@@ -1470,6 +1616,13 @@ class EavBehavior extends Behavior
                 $field = $fieldNameOf($rawField);
                 $op = strtoupper((string)($expr->getOperator() ?? '='));
                 $value = $expr->getValue();
+                // Normalize Cake's NullExpression to PHP null so null-op logic applies
+                if ($value instanceof \Cake\Database\Expression\NullExpression) {
+                    $value = null;
+                }
+
+                // Note: array-form keys like "color IS NOT" => null are not supported in method-based where([...]).
+                // Use string-form predicates (e.g., where('color IS NOT NULL')) or named-argument conditions: ['color IS NOT NULL'] instead.
 
                 if ($field !== null && $field !== '' && !str_contains($field, '.') && !isset($nativeColumns[$field])) {
                     if ($value === null) {
@@ -1533,11 +1686,124 @@ class EavBehavior extends Behavior
                     continue;
                 }
 
+                // Handle raw string predicates like "color IS NOT NULL" / "color IS NULL"
+                if (is_string($part)) {
+                    $s = trim($part);
+                    if ($s !== '' && preg_match('/^\s*([a-zA-Z0-9_]+)\s+(IS NOT NULL|IS NULL)\s*$/i', $s, $mm)) {
+                        $field = (string)$mm[1];
+                        $op = strtoupper((string)$mm[2]);
+                        if ($field !== '' && !str_contains($field, '.') && !isset($nativeColumns[$field])) {
+                            // Resolve type
+                            $resolvedType = null;
+                            if (isset($overrideTypes[$field]) && is_string($overrideTypes[$field])) {
+                                $resolvedType = strtolower((string)$overrideTypes[$field]);
+                            } elseif (isset($map[$field]['type'])) {
+                                $resolvedType = strtolower((string)$map[$field]['type']);
+                            } else {
+                                try {
+                                    $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
+                                    $row = $Attributes->find()->select(['data_type'])->where(['name' => $field])->enableHydration(false)->first();
+                                    if ($row && isset($row['data_type'])) {
+                                        $resolvedType = strtolower((string)$row['data_type']);
+                                    }
+                                } catch (\Throwable) {
+                                    // ignore lookup errors
+                                }
+                                if ($resolvedType === null) {
+                                    $resolvedType = 'string';
+                                }
+                            }
+
+                            // Resolve attr id
+                            $attrId = null;
+                            try {
+                                $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
+                                $attrRow = $Attributes->find()->select(['id'])->where(['name' => $field])->enableHydration(false)->first();
+                                if ($attrRow && isset($attrRow['id'])) {
+                                    $attrId = (string)$attrRow['id'];
+                                }
+                            } catch (\Throwable) {
+                                // ignore lookup errors
+                            }
+                            if ($attrId === null) {
+                                // Unknown attribute: for IS NULL keep; for IS NOT NULL make impossible
+                                if ($op !== 'IS NULL') {
+                                    $group->add('0=1');
+                                } else {
+                                    $group->add($part);
+                                }
+                                continue;
+                            }
+
+                            $safeAttr = preg_replace('/[^a-z0-9_]+/i', '_', strtolower($field));
+                            $safeType = preg_replace('/[^a-z0-9_]+/i', '_', strtolower((string)$resolvedType));
+                            $alias = 'EAV_' . $safeAttr . '_' . $safeType;
+                            $tableName = 'eav_' . strtolower((string)$resolvedType);
+
+                            // Join: IS NULL => LEFT; IS NOT NULL => INNER
+                            $isNullCheck = ($op === 'IS NULL');
+                            $joinMethod = $isNullCheck ? 'leftJoin' : 'innerJoin';
+
+                            if (!isset($joinedAliases[$alias])) {
+                                $query->{$joinMethod}(
+                                    [$alias => $tableName],
+                                    [
+                                        "{$alias}.{$entityField} = {$rootAlias}.{$rootPk}",
+                                        "{$alias}.eav_entity_id" => $eavEntityId,
+                                        "{$alias}.eav_attribute_id" => $attrId,
+                                    ]
+                                );
+                                $joinedAliases[$alias] = true;
+                            }
+
+                            // Apply null predicate
+                            if ($op === 'IS NULL') {
+                                $group->add("{$alias}.value IS NULL");
+                            } else {
+                                $group->add("{$alias}.value IS NOT NULL");
+                            }
+
+                            // Project alias if not yet selected (for hydration/order)
+                            if (!isset($projected[$field])) {
+                                $query->select([$field => $query->newExpr("{$alias}.value")]);
+
+                                $normalized = strtolower((string)$resolvedType);
+                                switch ($normalized) {
+                                    case 'smallinteger':
+                                    case 'tinyinteger':
+                                    case 'biginteger':
+                                        $normalized = 'integer';
+                                        break;
+                                    case 'datetimefractional':
+                                    case 'timestamp':
+                                    case 'timestampfractional':
+                                    case 'timestamptimezone':
+                                        $normalized = 'datetime';
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                $query->getSelectTypeMap()->addDefaults([$field => $normalized]);
+                                $projected[$field] = true;
+                            }
+                            continue;
+                        }
+                    }
+
+                    // Preserve unknown strings
+                    $group->add($part);
+                    continue;
+                }
+
                 if ($part instanceof ComparisonExpression) {
                     $rawField = $part->getField();
                     $field = $fieldNameOf($rawField);
                     $op = strtoupper((string)($part->getOperator() ?? '='));
                     $value = $part->getValue();
+                    // Normalize Cake's NullExpression to PHP null so null-op logic applies
+                    if ($value instanceof \Cake\Database\Expression\NullExpression) {
+                        $value = null;
+                    }
 
                     // Only rewrite simple, unqualified attribute names
                     if ($field !== null && $field !== '' && !str_contains($field, '.') && !isset($nativeColumns[$field])) {
@@ -1586,6 +1852,20 @@ class EavBehavior extends Behavior
                             case 'IS NOT NULL':
                                 $group->add("{$alias}.value IS NOT NULL");
                                 break;
+                            case 'IN':
+                            case 'NOT IN': {
+                                // Bind list values safely
+                                $vals = is_iterable($value) ? $value : [$value];
+                                $placeholders = [];
+                                foreach ($vals as $v) {
+                                    $p = $nextParam('v');
+                                    $query->bind($p, $v);
+                                    $placeholders[] = $p;
+                                }
+                                $list = implode(',', $placeholders);
+                                $group->add("{$alias}.value {$op} ({$list})");
+                                break;
+                            }
                             case 'LIKE':
                             case '=':
                             case '!=':
@@ -2012,7 +2292,8 @@ class EavBehavior extends Behavior
         if ($attribute === '') {
             return $query;
         }
-        $type = (string)($options['type'] ?? 'string');
+        // Accept non-conflicting key 'attrType' for CakePHP 5.2 named arguments; fallback to legacy 'type'
+        $type = (string)($options['attrType'] ?? $options['type'] ?? 'string');
         $op = strtoupper((string)($options['op'] ?? '='));
         $value = $options['value'] ?? null;
 
@@ -2082,15 +2363,23 @@ class EavBehavior extends Behavior
      */
     protected function resolveJsonStorage(string $rawType, array $meta = []): ?string
     {
-        if ($rawType !== 'json' && $rawType !== 'jsonb') {
+        $raw = strtolower($rawType);
+        if ($raw !== 'json' && $raw !== 'jsonb') {
             return null;
         }
+
+        // Honor explicit raw type "jsonb" regardless of config/meta (caller intent wins)
+        if ($raw === 'jsonb') {
+            return 'jsonb';
+        }
+
+        // For "json", prefer meta override, then behavior config, else default to "json"
         $storage = $meta['jsonStorage'] ?? $meta['storage'] ?? $this->getConfig('jsonStorage');
-        if (!is_string($storage) || !in_array($storage, ['json', 'jsonb'], true)) {
+        if (!is_string($storage) || !in_array(strtolower((string)$storage), ['json', 'jsonb'], true)) {
             $storage = 'json';
         }
-        // Storage does not influence class/table naming anymore, only column type.
-        return $storage;
+
+        return strtolower((string)$storage);
     }
 
     /**
@@ -2380,6 +2669,13 @@ class EavBehavior extends Behavior
                 $field = $fieldNameOf($rawField);
                 $op = strtoupper((string)($expr->getOperator() ?? '='));
                 $value = $expr->getValue();
+                // Normalize Cake's NullExpression to PHP null so null-op logic applies
+                if ($value instanceof \Cake\Database\Expression\NullExpression) {
+                    $value = null;
+                }
+
+                // Note: array-form keys like "color IS NOT" => null are not supported in method-based where([...]).
+                // Use string-form predicates (e.g., where('color IS NOT NULL')) or named-argument conditions: ['color IS NOT NULL'] instead.
 
                 if ($field !== null && $field !== '' && !str_contains($field, '.') && !isset($nativeColumns[$field])) {
                     if ($value === null) {
@@ -2410,6 +2706,25 @@ class EavBehavior extends Behavior
                     continue;
                 }
 
+                // Handle raw string predicates like "color IS NOT NULL" / "color IS NULL"
+                if (is_string($part)) {
+                    $str = trim($part);
+                    if ($str !== '' && preg_match('/^\s*([a-zA-Z0-9_]+)\s+(IS NOT NULL|IS NULL)\s*$/i', $str, $mm)) {
+                        $field = (string)$mm[1];
+                        $op = strtoupper((string)$mm[2]);
+                        if ($field !== '' && !str_contains($field, '.') && !isset($nativeColumns[$field])) {
+                            $hintType = $overrideTypes[$field] ?? $configuredTypes[$field] ?? null;
+                            $fragment = $this->buildWhereFragment($query, $field, $op, null, $hintType);
+                            $group->add($fragment['sql']);
+                            $this->bindParams($query, $fragment['params']);
+                            continue;
+                        }
+                    }
+                    // Preserve unknown strings
+                    $group->add($part);
+                    continue;
+                }
+
                 if ($part instanceof UnaryExpression) {
                     $ident = null;
                     $part->traverse(function ($e) use (&$ident) {
@@ -2437,6 +2752,10 @@ class EavBehavior extends Behavior
                     $field = $fieldNameOf($rawField);
                     $op = strtoupper((string)($part->getOperator() ?? '='));
                     $value = $part->getValue();
+                    // Normalize Cake's NullExpression to PHP null so null-op logic applies
+                    if ($value instanceof \Cake\Database\Expression\NullExpression) {
+                        $value = null;
+                    }
 
                     if ($field !== null && $field !== '' && !str_contains($field, '.') && !isset($nativeColumns[$field])) {
                         if ($value === null) {

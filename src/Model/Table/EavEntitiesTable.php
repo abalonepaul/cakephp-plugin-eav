@@ -3,29 +3,35 @@ declare(strict_types=1);
 
 namespace Eav\Model\Table;
 
+use Cake\Datasource\EntityInterface;
+use Cake\Datasource\ResultSetInterface;
+use Cake\ORM\Behavior\TimestampBehavior;
 use Cake\ORM\Query\SelectQuery;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Closure;
+use Eav\Model\Entity\EavEntity;
+use Psr\SimpleCache\CacheInterface;
 
 /**
  * EavEntities Model
  *
- * @method \Eav\Model\Entity\EavEntity newEmptyEntity()
- * @method \Eav\Model\Entity\EavEntity newEntity(array $data, array $options = [])
- * @method array<\Eav\Model\Entity\EavEntity> newEntities(array $data, array $options = [])
- * @method \Eav\Model\Entity\EavEntity get(mixed $primaryKey, array|string $finder = 'all', \Psr\SimpleCache\CacheInterface|string|null $cache = null, \Closure|string|null $cacheKey = null, mixed ...$args)
- * @method \Eav\Model\Entity\EavEntity findOrCreate($search, ?callable $callback = null, array $options = [])
- * @method \Eav\Model\Entity\EavEntity patchEntity(\Cake\Datasource\EntityInterface $entity, array $data, array $options = [])
- * @method array<\Eav\Model\Entity\EavEntity> patchEntities(iterable $entities, array $data, array $options = [])
- * @method \Eav\Model\Entity\EavEntity|false save(\Cake\Datasource\EntityInterface $entity, array $options = [])
- * @method \Eav\Model\Entity\EavEntity saveOrFail(\Cake\Datasource\EntityInterface $entity, array $options = [])
- * @method iterable<\Eav\Model\Entity\EavEntity>|\Cake\Datasource\ResultSetInterface<\Eav\Model\Entity\EavEntity>|false saveMany(iterable $entities, array $options = [])
- * @method iterable<\Eav\Model\Entity\EavEntity>|\Cake\Datasource\ResultSetInterface<\Eav\Model\Entity\EavEntity> saveManyOrFail(iterable $entities, array $options = [])
- * @method iterable<\Eav\Model\Entity\EavEntity>|\Cake\Datasource\ResultSetInterface<\Eav\Model\Entity\EavEntity>|false deleteMany(iterable $entities, array $options = [])
- * @method iterable<\Eav\Model\Entity\EavEntity>|\Cake\Datasource\ResultSetInterface<\Eav\Model\Entity\EavEntity> deleteManyOrFail(iterable $entities, array $options = [])
+ * @method EavEntity newEmptyEntity()
+ * @method EavEntity newEntity(array $data, array $options = [])
+ * @method array<EavEntity> newEntities(array $data, array $options = [])
+ * @method EavEntity get(mixed $primaryKey, array|string $finder = 'all', CacheInterface|string|null $cache = null, Closure|string|null $cacheKey = null, mixed ...$args)
+ * @method EavEntity findOrCreate($search, ?callable $callback = null, array $options = [])
+ * @method EavEntity patchEntity(EntityInterface $entity, array $data, array $options = [])
+ * @method array<EavEntity> patchEntities(iterable $entities, array $data, array $options = [])
+ * @method EavEntity|false save(EntityInterface $entity, array $options = [])
+ * @method EavEntity saveOrFail(EntityInterface $entity, array $options = [])
+ * @method iterable<EavEntity>|ResultSetInterface<EavEntity>|false saveMany(iterable $entities, array $options = [])
+ * @method iterable<EavEntity>|ResultSetInterface<EavEntity> saveManyOrFail(iterable $entities, array $options = [])
+ * @method iterable<EavEntity>|ResultSetInterface<EavEntity>|false deleteMany(iterable $entities, array $options = [])
+ * @method iterable<EavEntity>|ResultSetInterface<EavEntity> deleteManyOrFail(iterable $entities, array $options = [])
  *
- * @mixin \Cake\ORM\Behavior\TimestampBehavior
+ * @mixin TimestampBehavior
  */
 class EavEntitiesTable extends Table
 {
@@ -49,8 +55,8 @@ class EavEntitiesTable extends Table
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator): Validator
     {
@@ -98,8 +104,8 @@ class EavEntitiesTable extends Table
      * Returns a rules checker object that will be used for validating
      * application integrity.
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param RulesChecker $rules The rules object to be modified.
+     * @return RulesChecker
      */
     public function buildRules(RulesChecker $rules): RulesChecker
     {

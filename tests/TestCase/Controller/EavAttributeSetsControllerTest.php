@@ -22,61 +22,98 @@ class EavAttributeSetsControllerTest extends TestCase
      * @var array<string>
      */
     protected array $fixtures = [
-        'plugin.Eav.EavAttributeSets',
+        'plugin.Eav.AttributeSets',
+        'plugin.Eav.EavAttributes',
+        'plugin.Eav.EavAttributeSetsEavAttributes',
     ];
 
-    /**
-     * Test index method
-     *
-     * @return void
-     * @link \Eav\Controller\EavAttributeSetsController::index()
-     */
     public function testIndex(): void
     {
-        $this->markTestIncomplete('Not implemented yet.');
+        $this->get('/eav/eav-attribute-sets');
+        $this->assertResponseOk();
+        $this->assertStringContainsString('Default Set', (string)$this->_response->getBody());
     }
 
-    /**
-     * Test view method
-     *
-     * @return void
-     * @link \Eav\Controller\EavAttributeSetsController::view()
-     */
     public function testView(): void
     {
-        $this->markTestIncomplete('Not implemented yet.');
+        $this->get('/eav/eav-attribute-sets/view/aaaaaaaa-0000-0000-0000-aaaaaaaaaaaa');
+        $this->assertResponseOk();
+        $this->assertStringContainsString('Default Set', (string)$this->_response->getBody());
     }
 
-    /**
-     * Test add method
-     *
-     * @return void
-     * @link \Eav\Controller\EavAttributeSetsController::add()
-     */
     public function testAdd(): void
     {
-        $this->markTestIncomplete('Not implemented yet.');
+        $this->enableCsrfToken();
+        $this->enableSecurityToken();
+
+        $this->post('/eav/eav-attribute-sets/add', [
+            'name' => 'Another Set',
+            'eav_attributes' => ['_ids' => ['11111111-1111-1111-1111-111111111111']],
+        ]);
+        $this->assertResponseSuccess();
+
+        $Sets = $this->getTableLocator()->get('Eav.EavAttributeSets');
+        $set = $Sets->find()->where(['name' => 'Another Set'])->firstOrFail();
+
+        $Through = $this->getTableLocator()->get('Eav.EavAttributeSetsEavAttributes');
+        $count = $Through->find()->where([
+            'attribute_set_id' => $set->id,
+            'attribute_id' => '11111111-1111-1111-1111-111111111111',
+        ])->count();
+        $this->assertSame(1, $count);
     }
 
-    /**
-     * Test edit method
-     *
-     * @return void
-     * @link \Eav\Controller\EavAttributeSetsController::edit()
-     */
     public function testEdit(): void
     {
-        $this->markTestIncomplete('Not implemented yet.');
+        $this->enableCsrfToken();
+        $this->enableSecurityToken();
+
+        // Create a set first
+        $Sets = $this->getTableLocator()->get('Eav.EavAttributeSets');
+        $set = $Sets->newEntity(['name' => 'Temp Set']);
+        $Sets->saveOrFail($set);
+
+        // Attach color initially
+        $Through = $this->getTableLocator()->get('Eav.EavAttributeSetsEavAttributes');
+        $Through->saveOrFail($Through->newEntity(
+            [
+                'attribute_set_id' => $set->id,
+                'attribute_id' => '11111111-1111-1111-1111-111111111111',
+            ],
+            ['accessibleFields' => ['attribute_set_id' => true, 'attribute_id' => true]]
+        ));
+
+        // Edit to also include spec
+        $this->post('/eav/eav-attribute-sets/edit/' . $set->id, [
+            'name' => 'Temp Set',
+            'eav_attributes' => ['_ids' => [
+                '11111111-1111-1111-1111-111111111111',
+                '22222222-2222-2222-2222-222222222222',
+            ]],
+        ]);
+        $this->assertResponseSuccess();
+
+        $have = $Through->find()->where(['attribute_set_id' => $set->id])->all()->extract('attribute_id')->toList();
+        sort($have);
+        $this->assertSame([
+            '11111111-1111-1111-1111-111111111111',
+            '22222222-2222-2222-2222-222222222222',
+        ], $have);
     }
 
-    /**
-     * Test delete method
-     *
-     * @return void
-     * @link \Eav\Controller\EavAttributeSetsController::delete()
-     */
     public function testDelete(): void
     {
-        $this->markTestIncomplete('Not implemented yet.');
+        // Create a set to delete
+        $Sets = $this->getTableLocator()->get('Eav.EavAttributeSets');
+        $set = $Sets->newEntity(['name' => 'Del Set']);
+        $Sets->saveOrFail($set);
+
+        $this->enableCsrfToken();
+        $this->enableSecurityToken();
+        $this->post('/eav/eav-attribute-sets/delete/' . $set->id);
+        $this->assertResponseSuccess();
+
+        $exists = $Sets->find()->where(['id' => $set->id])->count() === 1;
+        $this->assertFalse($exists);
     }
 }

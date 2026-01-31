@@ -12,6 +12,8 @@ use Cake\Database\Driver\Postgres;
 use Cake\Database\Driver\Mysql;
 use Cake\Database\Driver\Sqlserver;
 use Cake\Database\Driver\Sqlite;
+use stdClass;
+use Throwable;
 
 class EavSetupInteractiveCommand extends Command
 {
@@ -35,8 +37,8 @@ class EavSetupInteractiveCommand extends Command
 
         // 1) Choose connection
         $configured = ConnectionManager::configured();
-        $defaultIdx = array_search('default', $configured, true);
-        $default = $defaultIdx !== false ? 'default' : (string)($configured[0] ?? 'default');
+        $defaultIdx = in_array('default', $configured, true);
+        $default = $defaultIdx !== false ? 'default' : $configured[0] ?? 'default';
         $connName = $io->askChoice('Select connection', $configured ?: [$default], $default);
 
         $conn = ConnectionManager::get($connName);
@@ -97,7 +99,7 @@ class EavSetupInteractiveCommand extends Command
                 foreach ($appTables as $idx => $t) {
                     $io->out(sprintf('  %d) %s', $idx + 1, $t));
                 }
-                $selection = trim((string)$io->ask('Tables (e.g., "1,3,5" or empty to skip)', ''));
+                $selection = trim($io->ask('Tables (e.g., "1,3,5" or empty to skip)', ''));
                 $indexes = [];
                 if ($selection !== '') {
                     foreach (explode(',', $selection) as $token) {
@@ -135,7 +137,7 @@ class EavSetupInteractiveCommand extends Command
                     // Accept either an existing column name OR a brand-new column name directly.
                     // If user enters "[add_new_column]" (or leaves blank), we will prompt for the name.
                     $defaultChoice = $jsonish ? $jsonish[0] : '[add_new_column]';
-                    $input = trim((string)$io->ask(
+                    $input = trim($io->ask(
                         sprintf('Use an existing JSON column or type a new column name (%s/[add_new_column])', $jsonish ? implode('|', $jsonish) : ''),
                         $defaultChoice
                     ));
@@ -149,7 +151,7 @@ class EavSetupInteractiveCommand extends Command
                         // If the user typed a custom name (not in existing list), accept it directly.
                         if ($input === '[add_new_column]') {
                             $proposed = in_array('attrs', $cols, true) ? 'spec' : 'attrs';
-                            $input = (string)$io->ask('Enter JSON column name to add', $proposed);
+                            $input = $io->ask('Enter JSON column name to add', $proposed);
                             $input = trim($input);
                             if ($input === '') {
                                 $input = $proposed;
@@ -182,7 +184,7 @@ class EavSetupInteractiveCommand extends Command
         $mode = $io->askChoice('Types to scaffold', ['defaults', 'all', 'custom'], 'defaults');
         $typesCsv = 'defaults';
         if ($mode === 'custom') {
-            $typesCsv = (string)$io->ask('Enter CSV list of types (aliases ok), e.g. "string,int,json,fk"');
+            $typesCsv = $io->ask('Enter CSV list of types (aliases ok), e.g. "string,int,json,fk"');
             if (trim($typesCsv) === '') {
                 $typesCsv = 'defaults';
             }
@@ -195,10 +197,10 @@ class EavSetupInteractiveCommand extends Command
         $types = $setup->resolveSelectedTypes($typesCsv);
 
         // 7) Migration/SQL name
-        $migrationName = (string)$io->ask('Migration class name (also used as base name for SQL output)', 'EavSetup');
+        $migrationName = $io->ask('Migration class name (also used as base name for SQL output)', 'EavSetup');
 
         // 8) Summary and confirmation before writing files
-        $jsonColumnsForJson = $jsonColumns !== [] ? $jsonColumns : new \stdClass(); // {} when empty
+        $jsonColumnsForJson = $jsonColumns !== [] ? $jsonColumns : new stdClass(); // {} when empty
         $summary = [
             'connection' => $connName,
             'driver' => get_class($driver),
@@ -273,7 +275,7 @@ class EavSetupInteractiveCommand extends Command
                     foreach ($jsonColumns as $t => $col) {
                         $io->out(sprintf('Index options for %s.%s (Postgres):', $t, $col));
                         $gin = $io->askChoice(' - Add GIN index on the JSONB column?', ['yes', 'no'], 'no') === 'yes';
-                        $keysCsv = (string)$io->ask(' - Functional indexes (CSV of keys to index, blank to skip)', '');
+                        $keysCsv = $io->ask(' - Functional indexes (CSV of keys to index, blank to skip)', '');
                         $keys = array_values(array_filter(array_map('trim', explode(',', $keysCsv))));
                         $pgIndexSpec[$t] = ['gin' => $gin, 'keys' => $keys];
                     }
@@ -283,13 +285,13 @@ class EavSetupInteractiveCommand extends Command
                 foreach ($jsonColumns as $tableName => $columnName) {
                     // Always emit the column-add DDL in raw SQL output (existence checks are out of scope here)
                     $colType = ($driver instanceof Postgres) ? 'JSONB' : 'JSON';
-                    $sql .= "ALTER TABLE {$tableName} ADD COLUMN {$columnName} {$colType} NULL;\n";
+                    $sql .= "ALTER TABLE $tableName ADD COLUMN $columnName $colType NULL;\n";
 
                     if ($driver instanceof Postgres) {
                         $spec = $pgIndexSpec[$tableName] ?? ['gin' => false, 'keys' => []];
                         if (!empty($spec['gin'])) {
                             $ginIdx = "idx_{$tableName}_{$columnName}_gin";
-                            $sql .= "CREATE INDEX IF NOT EXISTS {$ginIdx} ON {$tableName} USING GIN ({$columnName});\n";
+                            $sql .= "CREATE INDEX IF NOT EXISTS $ginIdx ON $tableName USING GIN ($columnName);\n";
                         }
                         if (!empty($spec['keys'])) {
                             // Index names and creation SQL are generated in the subsequent loop using $safeKey.
@@ -302,12 +304,12 @@ class EavSetupInteractiveCommand extends Command
                         if (!empty($spec['keys'])) {
                             foreach ($spec['keys'] as $key) {
                                 $safeKey = preg_replace('/[^a-z0-9_]+/i', '_', strtolower($key));
-                                $fnIdx = "idx_{$tableName}_{$columnName}_key_{$safeKey}";
-                                $sql .= "CREATE INDEX IF NOT EXISTS {$fnIdx} ON {$tableName} ((({$columnName} ->> '{$key}')));\n";
+                                $fnIdx = "idx_{$tableName}_{$columnName}_key_$safeKey";
+                                $sql .= "CREATE INDEX IF NOT EXISTS $fnIdx ON $tableName ((($columnName ->> '$key')));\n";
                             }
                         }
                     } else {
-                        $sql .= "-- MySQL: functional indexes on JSON are limited; skipping index creation for {$tableName}.{$columnName}\n";
+                        $sql .= "-- MySQL: functional indexes on JSON are limited; skipping index creation for $tableName.$columnName\n";
                     }
                     $sql .= "\n";
                 }
@@ -315,12 +317,12 @@ class EavSetupInteractiveCommand extends Command
 
             // Header and write to Sql directory
             $header = "-- EAV Setup SQL\n"
-                . "-- connection: {$connName}\n"
+                . "-- connection: $connName\n"
                 . "-- driver: " . get_class($driver) . "\n"
-                . "-- pkType: {$pkType}\n"
-                . "-- uuidType: {$uuidType}\n"
-                . "-- jsonAttributeStorage: {$jsonStorage}\n"
-                . "-- storageDefault: {$storageDefault}\n"
+                . "-- pkType: $pkType\n"
+                . "-- uuidType: $uuidType\n"
+                . "-- jsonAttributeStorage: $jsonStorage\n"
+                . "-- storageDefault: $storageDefault\n"
                 . "-- jsonColumns: " . ($jsonColumns ? json_encode($jsonColumns) : '{}') . "\n"
                 . "-- types: " . implode(',', $types) . "\n"
                 . "-- generatedAt: " . gmdate('c') . "\n\n";
@@ -345,7 +347,7 @@ class EavSetupInteractiveCommand extends Command
             if (isset($configPath) && is_string($configPath) && $configPath !== '' && file_exists($configPath)) {
                 try {
                     $rawCfg = file_get_contents($configPath);
-                    $cfgArr = $rawCfg !== false ? json_decode((string)$rawCfg, true, 512, JSON_THROW_ON_ERROR) : null;
+                    $cfgArr = $rawCfg !== false ? json_decode($rawCfg, true, 512, JSON_THROW_ON_ERROR) : null;
                     if (is_array($cfgArr)) {
                         $cfgArr['rawSql'] = [
                             'driver' => ($driver instanceof Postgres) ? 'postgres' : 'mysql',
@@ -358,7 +360,7 @@ class EavSetupInteractiveCommand extends Command
                             $io->warning('Failed to update rawSql in config file: ' . $configPath);
                         }
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $io->warning('Unable to update rawSql in config: ' . $e->getMessage());
                 }
             }
@@ -373,12 +375,12 @@ class EavSetupInteractiveCommand extends Command
         // Stamp a header summarizing the selections (same format as non-interactive)
         $header = "/**\n"
             . " * EAV Setup Migration\n"
-            . " * connection: {$connName}\n"
+            . " * connection: $connName\n"
             . " * driver: " . get_class($driver) . "\n"
-            . " * pkType: {$pkType}\n"
-            . " * uuidType: {$uuidType}\n"
-            . " * jsonAttributeStorage: {$jsonStorage}\n"
-            . " * storageDefault: {$storageDefault}\n"
+            . " * pkType: $pkType\n"
+            . " * uuidType: $uuidType\n"
+            . " * jsonAttributeStorage: $jsonStorage\n"
+            . " * storageDefault: $storageDefault\n"
             . " * jsonColumns: " . ($jsonColumns ? json_encode($jsonColumns) : '{}') . "\n"
             . " * types: " . implode(',', $types) . "\n"
             . " * generatedAt: " . gmdate('c') . "\n"
@@ -410,7 +412,7 @@ class EavSetupInteractiveCommand extends Command
                     foreach ($jsonColumns as $t => $col) {
                         $io->out(sprintf('Index options for %s.%s (Postgres):', $t, $col));
                         $gin = $io->askChoice(' - Add GIN index on the JSONB column?', ['yes', 'no'], 'no') === 'yes';
-                        $keysCsv = (string)$io->ask(' - Functional indexes (CSV of keys to index, blank to skip)', '');
+                        $keysCsv = $io->ask(' - Functional indexes (CSV of keys to index, blank to skip)', '');
                         $keys = array_values(array_filter(array_map('trim', explode(',', $keysCsv))));
                         $pgIndexSpec[$t] = ['gin' => $gin, 'keys' => $keys];
                     }
@@ -424,31 +426,31 @@ class EavSetupInteractiveCommand extends Command
                 $migBody[] = "";
                 $migBody[] = "use Migrations\\BaseMigration;";
                 $migBody[] = "";
-                $migBody[] = "class {$jsonMigClass} extends BaseMigration";
+                $migBody[] = "class $jsonMigClass extends BaseMigration";
                 $migBody[] = "{";
                 $migBody[] = "    public function change(): void";
                 $migBody[] = "    {";
                 foreach ($jsonColumns as $tableName => $columnName) {
                     $colType = ($driver instanceof Postgres) ? 'jsonb' : 'json';
-                    $migBody[] = "        // {$tableName}.{$columnName}";
-                    $migBody[] = "        \$t = \$this->table('{$tableName}');";
-                    $migBody[] = "        if (!\$t->hasColumn('{$columnName}')) {";
-                    $migBody[] = "            \$t->addColumn('{$columnName}', '{$colType}', ['null' => true])->update();";
+                    $migBody[] = "        // $tableName.$columnName";
+                    $migBody[] = "        \$t = \$this->table('$tableName');";
+                    $migBody[] = "        if (!\$t->hasColumn('$columnName')) {";
+                    $migBody[] = "            \$t->addColumn('$columnName', '$colType', ['null' => true])->update();";
                     $migBody[] = "        }";
                     if ($driver instanceof Postgres) {
                         $spec = $pgIndexSpec[$tableName] ?? ['gin' => false, 'keys' => []];
                         if (!empty($spec['gin'])) {
                             $ginIdx = "idx_{$tableName}_{$columnName}_gin";
-                            $migBody[] = "        // GIN index on {$tableName}.{$columnName}";
-                            $migBody[] = "        \$this->execute(\"CREATE INDEX IF NOT EXISTS {$ginIdx} ON {$tableName} USING GIN ({$columnName})\");";
+                            $migBody[] = "        // GIN index on $tableName.$columnName";
+                            $migBody[] = "        \$this->execute(\"CREATE INDEX IF NOT EXISTS $ginIdx ON $tableName USING GIN ($columnName)\");";
                         }
                         if (!empty($spec['keys'])) {
                             foreach ($spec['keys'] as $key) {
                                 $safeKey = preg_replace('/[^a-z0-9_]+/i', '_', strtolower($key));
-                                $fnIdx = "idx_{$tableName}_{$columnName}_key_{$safeKey}";
+                                $fnIdx = "idx_{$tableName}_{$columnName}_key_$safeKey";
                                 // Default to string; callers can recreate with typed casts later if needed
-                                $migBody[] = "        // Functional index on JSON key '{$key}'";
-                                $migBody[] = "        \$this->execute(\"CREATE INDEX IF NOT EXISTS {$fnIdx} ON {$tableName} ((({$columnName} ->> '{$key}')))\");";
+                                $migBody[] = "        // Functional index on JSON key '$key'";
+                                $migBody[] = "        \$this->execute(\"CREATE INDEX IF NOT EXISTS $fnIdx ON $tableName ((($columnName ->> '$key')))\");";
                             }
                         }
                     } else {

@@ -15,6 +15,7 @@ use Eav\Command\EavCreateAttributeCommand;
 use Eav\Command\EavMigrateJsonbToEavCommand;
 use Eav\Command\EavSetupCommand;
 use Eav\Command\EavSetupInteractiveCommand;
+use Throwable;
 
 /**
  * Eav plugin bootstrap.
@@ -39,7 +40,7 @@ class EavPlugin extends BasePlugin
                     Configure::write('Eav', $eav_config);
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             // Fail quietly; components/controllers fall back to hardcoded safe defaults
         }
     }
@@ -47,8 +48,8 @@ class EavPlugin extends BasePlugin
     /**
      * Register console commands.
      *
-     * @param \Cake\Console\CommandCollection $commands Command collection.
-     * @return \Cake\Console\CommandCollection
+     * @param CommandCollection $commands Command collection.
+     * @return CommandCollection
      */
     public function console(CommandCollection $commands): CommandCollection
     {
@@ -73,7 +74,7 @@ class EavPlugin extends BasePlugin
      * Defining the scope here ensures /eav/* resolves to plugin controllers without
      * additional app configuration.
      *
-     * @param \Cake\Routing\RouteBuilder $routes Route builder.
+     * @param RouteBuilder $routes Route builder.
      * @return void
      */
     public function routes(RouteBuilder $routes): void

@@ -5,11 +5,14 @@ namespace Eav\Command;
 
 use Cake\Command\Command;
 use Cake\Console\Arguments;
+use Cake\Console\CommandInterface;
 use Cake\Console\ConsoleIo;
+use Cake\Console\ConsoleOptionParser;
 use Cake\Database\Connection;
 use Cake\Database\Driver\Postgres;
 use Cake\Database\TypeFactory;
 use Cake\Datasource\ConnectionManager;
+use Exception;
 
 class EavMigrateJsonbToEavCommand extends Command
 {
@@ -33,9 +36,10 @@ class EavMigrateJsonbToEavCommand extends Command
     /**
      * Migrate JSONB key/value pairs to EAV attributes.
      *
-     * @param \Cake\Console\Arguments $args Arguments.
-     * @param \Cake\Console\ConsoleIo $io Console io.
+     * @param Arguments $args Arguments.
+     * @param ConsoleIo $io Console io.
      * @return int
+     * @throws Exception
      */
     public function execute(Arguments $args, ConsoleIo $io): int
     {
@@ -54,7 +58,7 @@ class EavMigrateJsonbToEavCommand extends Command
 
         if ($table === '' || $jsonbField === '' || $attribute === '') {
             $io->err('Usage: bin/cake eav migrate_jsonb_to_eav <table> <jsonbField> --attribute key --type decimal --entity-table items --pk uuid [--connection test]');
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
 
         /** @var Connection $conn */
@@ -62,13 +66,13 @@ class EavMigrateJsonbToEavCommand extends Command
         $driver = $conn->getDriver();
         if (!$driver instanceof Postgres) {
             $io->err('This command requires Postgres JSONB support.');
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
 
         // Normalize/validate type
         $normalizedType = $this->normalizeType($type, $io);
         if ($normalizedType === null) {
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
 
         // Ensure the source table exists on the selected connection
@@ -80,7 +84,7 @@ class EavMigrateJsonbToEavCommand extends Command
                 $table,
                 $connectionName
             ));
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
 
         $Attributes = $this->getTableLocator()->get('Eav.EavAttributes', ['connectionName' => $connectionName]);
@@ -107,8 +111,8 @@ class EavMigrateJsonbToEavCommand extends Command
         $preview = [];
         while (true) {
             // Use jsonb_exists() (cast to ::jsonb for safety if column is json) to avoid '?' placeholder issues.
-            $sql = "SELECT id, {$f} ->> :key AS val FROM {$t} WHERE jsonb_exists({$f}::jsonb, :key)";
-            $sql .= " ORDER BY id LIMIT {$batchSize} OFFSET {$offset}";
+            $sql = "SELECT id, $f ->> :key AS val FROM $t WHERE jsonb_exists($f::jsonb, :key)";
+            $sql .= " ORDER BY id LIMIT $batchSize OFFSET $offset";
             $rows = $conn->execute($sql, ['key' => $attribute])->fetchAll('assoc');
             if ($rows === []) {
                 break;
@@ -136,29 +140,29 @@ class EavMigrateJsonbToEavCommand extends Command
                 });
             }
 
-            $io->out("Processed {$count} rows...");
+            $io->out("Processed $count rows...");
             $offset += $batchSize;
         }
 
         if ($dryRun) {
-            $io->out("Dry run: {$count} values would be migrated.");
+            $io->out("Dry run: $count values would be migrated.");
             if ($preview !== []) {
                 $io->out('Preview:');
                 foreach ($preview as $row) {
-                    $io->out(sprintf('%s => %s', $row['id'], (string)$row['val']));
+                    $io->out(sprintf('%s => %s', $row['id'], $row['val']));
                 }
             }
         } else {
-            $io->out("Migrated {$count} values from {$table}.{$jsonbField} -> {$attribute} ({$normalizedType}).");
+            $io->out("Migrated $count values from $table.$jsonbField -> $attribute ($normalizedType).");
         }
-        return Command::CODE_SUCCESS;
+        return CommandInterface::CODE_SUCCESS;
     }
 
     /**
      * Normalize type and validate it against TypeFactory/custom types.
      *
      * @param string $type Raw type name.
-     * @param \Cake\Console\ConsoleIo $io Console io.
+     * @param ConsoleIo $io Console io.
      * @return string|null
      */
     protected function normalizeType(string $type, ConsoleIo $io): ?string
@@ -182,7 +186,7 @@ class EavMigrateJsonbToEavCommand extends Command
         return $normalized;
     }
 
-    public function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
+    public function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser
     {
         $parser->addArgument('table');
         $parser->addArgument('jsonbField');

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Eav\Model\Entity;
 
+use Cake\I18n\DateTime;
 use Cake\ORM\Entity;
 
 /**
@@ -13,8 +14,8 @@ use Cake\ORM\Entity;
  * @property string $data_type
  * @property string|null $placeholder
  * @property string|null $help_text
- * @property \Cake\I18n\DateTime $created
- * @property \Cake\I18n\DateTime|null $modified
+ * @property DateTime $created
+ * @property DateTime|null $modified
  */
 class EavAttribute extends Entity
 {

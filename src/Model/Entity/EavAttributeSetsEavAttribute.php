@@ -12,8 +12,8 @@ use Cake\ORM\Entity;
  * @property string $attribute_id
  * @property int|null $position
  *
- * @property \Eav\Model\Entity\EavAttributeSet $attribute_set
- * @property \Eav\Model\Entity\EavAttribute $attribute
+ * @property EavAttributeSet $attribute_set
+ * @property EavAttribute $attribute
  */
 class EavAttributeSetsEavAttribute extends Entity
 {
