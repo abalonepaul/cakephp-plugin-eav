@@ -3,29 +3,35 @@ declare(strict_types=1);
 
 namespace Eav\Model\Table;
 
+use Cake\Datasource\EntityInterface;
+use Cake\Datasource\ResultSetInterface;
+use Cake\ORM\Association\BelongsTo;
 use Cake\ORM\Query\SelectQuery;
 use Cake\ORM\RulesChecker;
 use Cake\ORM\Table;
 use Cake\Validation\Validator;
+use Closure;
+use Eav\Model\Entity\EavAttributeSetsEavAttribute;
+use Psr\SimpleCache\CacheInterface;
 
 /**
  * EavAttributeSetsEavAttributes Model
  *
- * @property \Eav\Model\Table\EavAttributeSetsTable&\Cake\ORM\Association\BelongsTo $EavAttributeSets
- * @property \Eav\Model\Table\EavAttributesTable&\Cake\ORM\Association\BelongsTo $EavAttributes
+ * @property EavAttributeSetsTable&BelongsTo $EavAttributeSets
+ * @property EavAttributesTable&BelongsTo $EavAttributes
  *
- * @method \Eav\Model\Entity\EavAttributeSetsEavAttribute newEmptyEntity()
- * @method \Eav\Model\Entity\EavAttributeSetsEavAttribute newEntity(array $data, array $options = [])
- * @method array<\Eav\Model\Entity\EavAttributeSetsEavAttribute> newEntities(array $data, array $options = [])
- * @method \Eav\Model\Entity\EavAttributeSetsEavAttribute get(mixed $primaryKey, array|string $finder = 'all', \Psr\SimpleCache\CacheInterface|string|null $cache = null, \Closure|string|null $cacheKey = null, mixed ...$args)
+ * @method EavAttributeSetsEavAttribute newEmptyEntity()
+ * @method EavAttributeSetsEavAttribute newEntity(array $data, array $options = [])
+ * @method array<EavAttributeSetsEavAttribute> newEntities(array $data, array $options = [])
+ * @method EavAttributeSetsEavAttribute get(mixed $primaryKey, array|string $finder = 'all', CacheInterface|string|null $cache = null, Closure|string|null $cacheKey = null, mixed ...$args)
  * @method \Eav.Model\Entity\EavAttributeSetsEavAttribute findOrCreate($search, ?callable $callback = null, array $options = [])
- * @method \Eav\Model\Entity\EavAttributeSetsEavAttribute patchEntity(\Cake\Datasource\EntityInterface $entity, array $data, array $options = [])
- * @method array<\Eav\Model\Entity\EavAttributeSetsEavAttribute> patchEntities(iterable $entities, array $data, array $options = [])
- * @method \Eav\Model\Entity\EavAttributeSetsEavAttribute|false save(\Cake\Datasource\EntityInterface $entity, array $options = [])
- * @method \Eav\Model\Entity\EavAttributeSetsEavAttribute saveOrFail(\Cake\Datasource\EntityInterface $entity, array $options = [])
- * @method iterable<\Eav\Model\Entity\EavAttributeSetsEavAttribute>|\Cake\Datasource\ResultSetInterface<\Eav\Model\Entity\EavAttributeSetsEavAttribute>|false saveMany(iterable $entities, array $options = [])
- * @method iterable<\Eav\Model\Entity\EavAttributeSetsEavAttribute>|\Cake\Datasource\ResultSetInterface<\Eav\Model\Entity\EavAttributeSetsEavAttribute> saveManyOrFail(iterable $entities, array $options = [])
- * @method iterable<\Eav\Model\Entity\EavAttributeSetsEavAttribute>|\Cake\Datasource\ResultSetInterface<\Eav\Model\Entity\EavAttributeSetsEavAttribute>|false deleteMany(iterable $entities, array $options = [])
+ * @method EavAttributeSetsEavAttribute patchEntity(EntityInterface $entity, array $data, array $options = [])
+ * @method array<EavAttributeSetsEavAttribute> patchEntities(iterable $entities, array $data, array $options = [])
+ * @method EavAttributeSetsEavAttribute|false save(EntityInterface $entity, array $options = [])
+ * @method EavAttributeSetsEavAttribute saveOrFail(EntityInterface $entity, array $options = [])
+ * @method iterable<EavAttributeSetsEavAttribute>|ResultSetInterface<EavAttributeSetsEavAttribute>|false saveMany(iterable $entities, array $options = [])
+ * @method iterable<EavAttributeSetsEavAttribute>|ResultSetInterface<EavAttributeSetsEavAttribute> saveManyOrFail(iterable $entities, array $options = [])
+ * @method iterable<EavAttributeSetsEavAttribute>|ResultSetInterface<EavAttributeSetsEavAttribute>|false deleteMany(iterable $entities, array $options = [])
  */
 class EavAttributeSetsEavAttributesTable extends Table
 {
@@ -61,8 +67,8 @@ class EavAttributeSetsEavAttributesTable extends Table
     /**
      * Default validation rules.
      *
-     * @param \Cake\Validation\Validator $validator Validator instance.
-     * @return \Cake\Validation\Validator
+     * @param Validator $validator Validator instance.
+     * @return Validator
      */
     public function validationDefault(Validator $validator): Validator
     {
@@ -77,8 +83,8 @@ class EavAttributeSetsEavAttributesTable extends Table
      * Returns a rules checker object that will be used for validating
      * application integrity.
      *
-     * @param \Cake\ORM\RulesChecker $rules The rules object to be modified.
-     * @return \Cake\ORM\RulesChecker
+     * @param RulesChecker $rules The rules object to be modified.
+     * @return RulesChecker
      */
     public function buildRules(RulesChecker $rules): RulesChecker
     {

@@ -15,7 +15,10 @@ use Cake\I18n\DateTime;
 use Cake\I18n\FrozenDate;
 use Cake\I18n\FrozenTime;
 use Cake\I18n\Time as I18nTime;
+use Cake\ORM\Behavior;
 use Cake\ORM\Query;
+use RuntimeException;
+use Throwable;
 
 /**
  * Internal helper for JSON Storage Mode (Postgres JSONB).
@@ -32,7 +35,7 @@ trait JsonColumnStorageTrait
      */
     protected function isJsonColumnMode(): bool
     {
-        /** @var \Cake\ORM\Behavior $this */
+        /** @var Behavior $this */
         $storage = (string)($this->getConfig('storage') ?? 'tables');
 
         return $storage === 'json_column';
@@ -41,15 +44,15 @@ trait JsonColumnStorageTrait
     /**
      * Resolve configured JSON column name for the attached table.
      *
-     * @throws \RuntimeException when missing.
+     * @throws RuntimeException when missing.
      */
     protected function getJsonColumn(): string
     {
-        /** @var \Cake\ORM\Behavior $this */
+        /** @var Behavior $this */
         $col = (string)($this->getConfig('jsonColumn') ?? '');
 
         if ($col === '') {
-            throw new \RuntimeException('JSON Storage Mode requires jsonColumn config (e.g., attrs/spec).');
+            throw new RuntimeException('JSON Storage Mode requires jsonColumn config (e.g., attrs/spec).');
         }
 
         return $col;
@@ -60,7 +63,7 @@ trait JsonColumnStorageTrait
      */
     protected function getAliasedJsonColumn(Query $query): string
     {
-        /** @var \Cake\ORM\Behavior $this */
+        /** @var Behavior $this */
         $alias = $this->getTable()->getAlias();
         $column = $this->getJsonColumn();
 
@@ -101,15 +104,15 @@ trait JsonColumnStorageTrait
      */
     protected function resolveAttributeType(string $attr, mixed $filterValue = null): string
     {
-        /** @var \Cake\ORM\Behavior $this */
+        /** @var Behavior $this */
         $map = (array)($this->getConfig('attributeTypeMap') ?? []);
         if (isset($map[$attr]) && is_string($map[$attr])) {
-            return strtolower((string)$map[$attr]);
+            return strtolower($map[$attr]);
         }
 
         // Lookup in Eav.EavAttributes if present (CakePHP 5.x: use TableLocator via Behavior).
         try {
-            /** @var \Cake\ORM\Behavior $this */
+            /** @var Behavior $this */
             $Attributes = $this->getTableLocator()->get('Eav.EavAttributes');
             $row = $Attributes->find()
                 ->select(['data_type'])
@@ -119,7 +122,7 @@ trait JsonColumnStorageTrait
             if ($row && isset($row['data_type'])) {
                 return strtolower((string)$row['data_type']);
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Ignore if table not available in context (tests or early boot).
         }
 
@@ -180,8 +183,8 @@ trait JsonColumnStorageTrait
 
         // Inline the JSON key as a safely quoted string literal to avoid binding in projections.
         $quotedKey = $this->quoteSqlLiteral($attr);
-        $extract = "({$col} ->> {$quotedKey})";
-        $expr = $cast ? "({$extract})::{$cast}" : $extract;
+        $extract = "($col ->> $quotedKey)";
+        $expr = $cast ? "($extract)::$cast" : $extract;
 
         return [
             'sql' => $expr,
@@ -205,8 +208,8 @@ trait JsonColumnStorageTrait
         $keyParam = ':k_' . preg_replace('/[^a-z0-9_]+/i', '_', $attr);
         $valParam = ':v_' . substr(hash('sha1', $attr . '_' . (string)microtime(true)), 0, 8);
 
-        $extract = "({$col} ->> {$keyParam})";
-        $lhs = $cast ? "({$extract})::{$cast}" : $extract;
+        $extract = "($col ->> $keyParam)";
+        $lhs = $cast ? "($extract)::$cast" : $extract;
 
         $sql = '';
         $params = [$keyParam => $attr];
@@ -218,7 +221,7 @@ trait JsonColumnStorageTrait
             case '>=':
             case '<':
             case '<=':
-                $sql = "{$lhs} {$op} {$valParam}";
+                $sql = "$lhs $op $valParam";
                 $params[$valParam] = $value;
                 break;
 
@@ -231,30 +234,30 @@ trait JsonColumnStorageTrait
                 }
                 $i = 0;
                 foreach ($value as $v) {
-                    $p = "{$valParam}_{$i}";
+                    $p = "{$valParam}_$i";
                     $params[$p] = $v;
                     $placeholders[] = $p;
                     $i++;
                 }
-                $sql = "{$lhs} {$op} (" . implode(',', $placeholders) . ')';
+                $sql = "$lhs $op (" . implode(',', $placeholders) . ')';
                 break;
 
             case 'LIKE':
             case 'ILIKE':
-                $sql = "{$lhs} {$op} {$valParam}";
+                $sql = "$lhs $op $valParam";
                 $params[$valParam] = $value;
                 break;
 
             case 'IS NULL':
             case 'IS NOT NULL':
                 // Use jsonb_exists to avoid PDO "?" placeholder conflicts.
-                $exists = "jsonb_exists(({$col})::jsonb, {$keyParam})";
-                $sql = ($op === 'IS NULL') ? "NOT {$exists}" : $exists;
+                $exists = "jsonb_exists(($col)::jsonb, $keyParam)";
+                $sql = ($op === 'IS NULL') ? "NOT $exists" : $exists;
                 break;
 
             default:
                 // Fallback as equality
-                $sql = "{$lhs} = {$valParam}";
+                $sql = "$lhs = $valParam";
                 $params[$valParam] = $value;
         }
 
@@ -275,12 +278,12 @@ trait JsonColumnStorageTrait
 
         // Inline the JSON key as a safely quoted string literal to avoid binding in ORDER BY.
         $quotedKey = $this->quoteSqlLiteral($attr);
-        $extract = "({$col} ->> {$quotedKey})";
-        $lhs = $cast ? "({$extract})::{$cast}" : $extract;
+        $extract = "($col ->> $quotedKey)";
+        $lhs = $cast ? "($extract)::$cast" : $extract;
 
         // Default NULLS LAST for more intuitive ordering of sparse attributes.
         return [
-            'sql' => "{$lhs} {$dir} NULLS LAST",
+            'sql' => "$lhs $dir NULLS LAST",
             'params' => [],
         ];
     }
@@ -369,7 +372,7 @@ trait JsonColumnStorageTrait
      *  $sql = $this->buildJsonbSetUpdateSql($conn, 'engines', 'attrs', ['color' => 'red', 'year_start' => 2010]);
      * Then run an UpdateQuery setting "attrs = <returned SQL>".
      *
-     * @param \Cake\Datasource\ConnectionInterface $conn Connection
+     * @param ConnectionInterface $conn Connection
      * @param string $table Fully qualified table name or unqualified (relies on search_path)
      * @param string $jsonColumn Column name (e.g., attrs)
      * @param array<string, mixed> $keyValues Map of key => value to set (null value will remove the key)
@@ -385,7 +388,7 @@ trait JsonColumnStorageTrait
     ): array {
         // Start from COALESCE(column, '{}'::jsonb)
         $colRef = ($alias ?: $table) . '.' . $jsonColumn;
-        $base = "COALESCE({$colRef}, '{}'::jsonb)";
+        $base = "COALESCE($colRef, '{}'::jsonb)";
 
         $sql = $base;
         $params = [];
@@ -394,25 +397,25 @@ trait JsonColumnStorageTrait
         foreach ($keyValues as $key => $value) {
             if ($value === null) {
                 // Remove key: (col - 'key')
-                $sql = "({$sql} - :rmk_{$i})";
-                $params[":rmk_{$i}"] = $key;
+                $sql = "($sql - :rmk_$i)";
+                $params[":rmk_$i"] = $key;
                 $i++;
                 continue;
             }
 
             // Set key: jsonb_set(sql, '{key}'::text[], to_jsonb(:v::type), true)
-            $valueParam = ":v_{$i}";
-            $keyParam = ":k_{$i}";
+            $valueParam = ":v_$i";
+            $keyParam = ":k_$i";
             $pgType = $this->pgCastForType($this->resolveAttributeType($key, $value));
 
             // If we know a pgType, cast appropriately to avoid string semantics.
             $valExpr = $pgType
-                ? "to_jsonb({$valueParam}::{$pgType})"
-                : "to_jsonb({$valueParam}::text)";
+                ? "to_jsonb($valueParam::$pgType)"
+                : "to_jsonb($valueParam::text)";
 
             // jsonb_set second argument must be text[] (path), not text
-            $pathExpr = "('{' || {$keyParam} || '}')::text[]";
-            $sql = "jsonb_set({$sql}, {$pathExpr}, {$valExpr}, true)";
+            $pathExpr = "('{' || $keyParam || '}')::text[]";
+            $sql = "jsonb_set($sql, $pathExpr, $valExpr, true)";
             $params[$valueParam] = $value;
             $params[$keyParam] = $key;
             $i++;

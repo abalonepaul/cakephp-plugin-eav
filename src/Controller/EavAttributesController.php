@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace Eav\Controller;
 
 use App\Controller\AppController;
+use Cake\Datasource\Exception\RecordNotFoundException;
+use Cake\Http\Response;
 
 /**
  * EavAttributes Controller
@@ -25,7 +27,7 @@ class EavAttributesController extends AppController
      * Eager-load EavAttributeSets so the index view can display “Used in X sets” badges
      * without issuing per-row queries.
      *
-     * @return \Cake\Http\Response|null|void Renders view
+     * @return void Renders view
      */
     public function index()
     {
@@ -42,8 +44,8 @@ class EavAttributesController extends AppController
      * View method
      *
      * @param string|null $id Eav Attribute id.
-     * @return \Cake\Http\Response|null|void Renders view
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @return void|null Renders view
+     * @throws RecordNotFoundException When record not found.
      */
     public function view($id = null)
     {
@@ -54,7 +56,7 @@ class EavAttributesController extends AppController
     /**
      * Add method
      *
-     * @return \Cake\Http\Response|null|void Redirects on successful add, renders view otherwise.
+     * @return Response|null|void Redirects on successful add, renders view otherwise.
      */
     public function add()
     {
@@ -76,10 +78,10 @@ class EavAttributesController extends AppController
      * Edit method
      *
      * @param string|null $id Eav Attribute id.
-     * @return \Cake\Http\Response|null|void Redirects on successful edit, renders view otherwise.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @return Response|null|void Redirects on successful edit, renders view otherwise.
+     * @throws RecordNotFoundException When record not found.
      */
-    public function edit($id = null)
+    public function edit(string $id = null)
     {
         $eavAttribute = $this->EavAttributes->get($id, contain: ['EavAttributeSets']);
         if ($this->request->is(['patch', 'post', 'put'])) {
@@ -101,8 +103,8 @@ class EavAttributesController extends AppController
      * Guardrail: EavAttributesTable::beforeDelete prevents deletion if attribute is used by any set.
      *
      * @param string|null $id Eav Attribute id.
-     * @return \Cake\Http\Response|null Redirects to index.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @return Response|null Redirects to index.
+     * @throws RecordNotFoundException When record not found.
      */
     public function delete($id = null)
     {

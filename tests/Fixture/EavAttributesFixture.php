@@ -66,6 +66,15 @@ class EavAttributesFixture extends TestFixture
                 'created' => '2024-01-01 00:00:00',
                 'modified' => '2024-01-01 00:00:00',
             ],
+            [
+                'id' => '33333333-3333-3333-3333-333333333333',
+                'name' => 'year_start',
+                'data_type' => 'integer',
+                'placeholder' => null,
+                'help_text' => null,
+                'created' => '2024-01-01 00:00:00',
+                'modified' => '2024-01-01 00:00:00',
+            ],
         ];
 
         parent::init();

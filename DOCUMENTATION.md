@@ -223,6 +223,40 @@ Code references (JetBrains navigation)
     - Magic finders work (e.g., findByColor); WHERE/ORDER/SELECT are rewritten with typed casts.
     - Per-query options: eavRewrite (bool), eavTypes (['attr' => 'type']).
 
+- Null predicates (IS NULL / IS NOT NULL)
+  - Summary
+    - In CakePHP 5.2, the safest, supported way to filter on NULL is to use string-form predicates, which the EAV behavior rewrites correctly in both storage modes (tables and JSON Storage Mode).
+    - Array-form comparisons with a NULL right-hand side (e.g., ['color !=' => null] or ['color IS NOT' => null]) are not reliably modeled by the ORM and are not supported in method-based where([...]) in this plugin.
+  - Supported forms (both storage modes)
+    - Method-based where (string literal):
+      ```php
+      $query->where('color IS NOT NULL');
+      $query->where('color IS NULL');
+      ```
+    - Method-based where (array of string parts):
+      ```php
+      $query->where(['color IS NOT NULL']);
+      $query->where(['color IS NULL']);
+      ```
+    - Named argument "conditions" in find():
+      ```php
+      $Products->find('all', conditions: ['color IS NOT NULL']);
+      $Products->find('all', conditions: ['color IS NULL']);
+      ```
+  - Notes on unsupported array forms
+    - The following are not supported in method-based where([...]):
+      ```php
+      $query->where(['color !=' => null]);
+      $query->where(['color IS NOT' => null]);
+      ```
+    - If you need an array-form in named-argument conditions for find(), prefer the string predicate inside the array:
+      ```php
+      $Products->find('all', conditions: ['color IS NOT NULL']);
+      ```
+  - Rationale
+    - CakePHP 5.2 builds different internal expression nodes for array-form NULL comparisons that can lose the "NOT" operator context. The plugin’s rewriters operate safely on string predicates and ComparisonExpression/UnaryExpression nodes that preserve intent.
+    - Supporting the unsupported array-forms would require brittle pre-parsing and is intentionally avoided.
+
 - Saving attributes
   - Tables storage: afterSave persists attributes with persist=true to typed eav_* tables.
   - JSON Storage Mode: afterSave applies jsonb_set to update only changed keys; passing null removes a key.

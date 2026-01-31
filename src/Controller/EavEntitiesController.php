@@ -5,12 +5,17 @@ namespace Eav\Controller;
 
 use App\Controller\AppController;
 use Cake\Datasource\ConnectionManager;
+use Cake\Datasource\EntityInterface;
+use Cake\Datasource\Exception\RecordNotFoundException;
+use Cake\Http\Response;
 use Cake\Utility\Inflector;
+use Eav\Model\Table\EavEntitiesTable;
+use Throwable;
 
 /**
  * EavEntities Controller
  *
- * @property \Eav\Model\Table\EavEntitiesTable $EavEntities
+ * @property EavEntitiesTable $EavEntities
  */
 class EavEntitiesController extends AppController
 {
@@ -71,10 +76,10 @@ class EavEntitiesController extends AppController
      * - pk_type/uuid_subtype: detected from the selected table's primary key column type.
      * - json_column: cleared unless storage_default is json_column.
      *
-     * @param \Cake\Datasource\EntityInterface $entity
+     * @param EntityInterface $entity
      * @return void
      */
-    protected function applySmartDefaults(\Cake\Datasource\EntityInterface $entity): void
+    protected function applySmartDefaults(EntityInterface $entity): void
     {
         $name = (string)($entity->get('name') ?? '');
         $modelAlias = (string)($entity->get('model_alias') ?? '');
@@ -140,7 +145,7 @@ class EavEntitiesController extends AppController
                         $entity->set('uuid_subtype', $subtype);
                     }
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable) {
                 // Non-fatal; leave any user-provided values as-is
             }
         }
@@ -154,7 +159,7 @@ class EavEntitiesController extends AppController
     /**
      * Index method
      *
-     * @return \Cake\Http\Response|null|void Renders view
+     * @return void|null Renders view
      */
     public function index()
     {
@@ -168,8 +173,8 @@ class EavEntitiesController extends AppController
      * View method
      *
      * @param string|null $id Eav Entity id.
-     * @return \Cake\Http\Response|null|void Renders view
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @return void|null Renders view
+     * @throws RecordNotFoundException When record not found.
      */
     public function view($id = null)
     {
@@ -180,7 +185,7 @@ class EavEntitiesController extends AppController
     /**
      * Add method
      *
-     * @return \Cake\Http\Response|null|void Redirects on successful add, renders view otherwise.
+     * @return Response|null|void Redirects on successful add, renders view otherwise.
      */
     public function add()
     {
@@ -220,8 +225,8 @@ class EavEntitiesController extends AppController
      * Edit method
      *
      * @param string|null $id Eav Entity id.
-     * @return \Cake\Http\Response|null|void Redirects on successful edit, renders view otherwise.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @return Response|null|void Redirects on successful edit, renders view otherwise.
+     * @throws RecordNotFoundException When record not found.
      */
     public function edit($id = null)
     {
@@ -261,10 +266,10 @@ class EavEntitiesController extends AppController
      * Delete method
      *
      * @param string|null $id Eav Entity id.
-     * @return \Cake\Http\Response|null Redirects to index.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @return Response|null Redirects to index.
+     * @throws RecordNotFoundException When record not found.
      */
-    public function delete($id = null)
+    public function delete($id = null): ?Response
     {
         $this->request->allowMethod(['post', 'delete']);
         $eavEntity = $this->EavEntities->get($id);

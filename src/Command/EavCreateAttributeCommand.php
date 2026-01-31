@@ -5,9 +5,12 @@ namespace Eav\Command;
 
 use Cake\Command\Command;
 use Cake\Console\Arguments;
+use Cake\Console\CommandInterface;
 use Cake\Console\ConsoleIo;
+use Cake\Console\ConsoleOptionParser;
 use Cake\Database\TypeFactory;
 use Cake\Datasource\ConnectionManager;
+use Throwable;
 
 class EavCreateAttributeCommand extends Command
 {
@@ -34,8 +37,8 @@ class EavCreateAttributeCommand extends Command
      * Flags-only UX:
      *   bin/cake eav create_attribute --name <name> --type <type> [--connection <name>]
      *
-     * @param \Cake\Console\Arguments $args Arguments.
-     * @param \Cake\Console\ConsoleIo $io Console io.
+     * @param Arguments $args Arguments.
+     * @param ConsoleIo $io Console io.
      * @return int
      */
     public function execute(Arguments $args, ConsoleIo $io): int
@@ -47,27 +50,27 @@ class EavCreateAttributeCommand extends Command
         if ($name === '') {
             $io->err('Missing required option: --name');
             $io->err('Usage: bin/cake eav create_attribute --name <name> --type <type> [--connection <name>]');
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
         if ($type === '') {
             $io->err('Missing required option: --type');
             $io->err('Usage: bin/cake eav create_attribute --name <name> --type <type> [--connection <name>]');
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
 
         // Resolve and validate connection
         $connectionName = (string)($args->getOption('connection') ?? 'default');
         try {
             ConnectionManager::get($connectionName);
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             $io->err('Unknown connection: ' . $connectionName);
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
         $io->out('Using connection: ' . $connectionName);
 
         $normalizedType = $this->normalizeType($type, $io);
         if ($normalizedType === null) {
-            return Command::CODE_ERROR;
+            return CommandInterface::CODE_ERROR;
         }
 
         // Use the selected connection for the attributes registry; avoid reconfiguring an existing registry instance.
@@ -87,7 +90,7 @@ class EavCreateAttributeCommand extends Command
         $existing = $Attributes->find()->select(['id'])->where(['name' => $name])->first();
         if ($existing) {
             $io->out('Attribute already exists: ' . $name);
-            return Command::CODE_SUCCESS;
+            return CommandInterface::CODE_SUCCESS;
         }
 
         $entity = $Attributes->newEntity([
@@ -96,17 +99,17 @@ class EavCreateAttributeCommand extends Command
         ]);
         if ($Attributes->save($entity)) {
             $io->out('Created attribute ' . $name . ' (' . $normalizedType . ')');
-            return Command::CODE_SUCCESS;
+            return CommandInterface::CODE_SUCCESS;
         }
         $io->err('Failed to create attribute');
-        return Command::CODE_ERROR;
+        return CommandInterface::CODE_ERROR;
     }
 
     /**
      * Normalize type and validate it against TypeFactory/custom types.
      *
      * @param string $type Raw type name.
-     * @param \Cake\Console\ConsoleIo $io Console io.
+     * @param ConsoleIo $io Console io.
      * @return string|null
      */
     protected function normalizeType(string $type, ConsoleIo $io): ?string
@@ -130,7 +133,7 @@ class EavCreateAttributeCommand extends Command
         return $normalized;
     }
 
-    public function buildOptionParser(\Cake\Console\ConsoleOptionParser $parser): \Cake\Console\ConsoleOptionParser
+    public function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser
     {
         // Flags-only parser (no positional arguments)
         $parser

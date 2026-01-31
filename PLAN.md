@@ -367,7 +367,7 @@ Summary and Confirmation
    - JSON Attribute (eav_json) behavior and setup are unaffected.
    - jsonEncodeOnWrite default false globally; ignored in JSON Storage Mode; still respected for JSON Attribute.
 
-### Summary: Feature 3/EAV-13 – JSON Storage Mode (EAV in a single JSON/JSONB column)
+### Summary: Feature 3/EAV-13 – JSON Storage Mode (EAV in a single JSON/JSONB column) (Done)
 
 #### Overview
 - Goal: Add a “JSON Storage Mode” to the EAV plugin so all attributes for an entity can be stored in a single JSON/JSONB column on the entity’s table (e.g., Items.attrs, Products.spec) while maintaining typed queries and CakeORM ergonomics.
@@ -1139,7 +1139,7 @@ Acceptance
 - All controller integration tests pass against the test connection.
 - No UI sort attempts on the “Actions” column; headers labeled plainly (no Paginator->sort on Actions).
 
-## Feature 9/EAV-1 — UI scaffolding (bake) and polish
+## Feature 9/EAV-1 — UI scaffolding (bake) and polish (Done)
 
 Status
 - CRUD has been baked for EavAttributes, EavAttributeSets, and EavEntities under plugin routes (/eav/*).

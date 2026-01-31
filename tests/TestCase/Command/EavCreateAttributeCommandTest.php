@@ -92,4 +92,11 @@ class EavCreateAttributeCommandTest extends TestCase
         $this->assertExitError();
         $this->assertErrorContains('Missing required option: --type');
     }
+
+    public function testUnsupportedTypeShowsError(): void
+    {
+        $this->exec('eav create_attribute --name bad --type bogus --connection test');
+        $this->assertExitError();
+        $this->assertErrorContains('Unsupported EAV type');
+    }
 }

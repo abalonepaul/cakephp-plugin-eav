@@ -20,7 +20,6 @@ class EavMigrateJsonbToEavCommandTest extends TestCase
         'plugin.Eav.EavAttributes',
         'plugin.Eav.EavEntities',
         'plugin.Eav.EavString',
-        'plugin.Eav.JsonEntities',
     ];
 
     public static function setUpBeforeClass(): void

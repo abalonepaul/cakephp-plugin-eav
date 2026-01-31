@@ -7,11 +7,13 @@ use Cake\Command\Command;
 use Cake\Console\Arguments;
 use Cake\Console\CommandInterface;
 use Cake\Console\ConsoleIo;
+use Cake\Database\Driver\Mysql;
 use Cake\Database\Driver\Postgres;
 use Cake\Database\TypeFactory;
 use Cake\Datasource\ConnectionManager;
 use Cake\Utility\Inflector;
 use Cake\Console\ConsoleOptionParser;
+use Throwable;
 
 class EavSetupCommand extends Command
 {
@@ -178,7 +180,7 @@ class EavSetupCommand extends Command
         $types = [];
         if ($configPathOpt !== '') {
             $json = file_get_contents($configPathOpt);
-            $cfg = $json !== false ? json_decode((string)$json, true) : null;
+            $cfg = $json !== false ? json_decode($json, true) : null;
             if (is_array($cfg) && isset($cfg['types']) && is_array($cfg['types'])) {
                 // Use types from config as-is (assumed normalized by the wizard)
                 $types = array_values(array_unique(array_map(fn($t) => strtolower((string)$t), $cfg['types'])));
@@ -193,8 +195,8 @@ class EavSetupCommand extends Command
         $outputMode = strtolower($outputMode) === 'raw_sql' ? 'raw_sql' : 'migrations';
 
         if ($outputMode === 'raw_sql') {
-            $isPg = $driver instanceof \Cake\Database\Driver\Postgres;
-            $isMy = $driver instanceof \Cake\Database\Driver\Mysql;
+            $isPg = $driver instanceof Postgres;
+            $isMy = $driver instanceof Mysql;
 
             if (!$isPg && !$isMy) {
                 $io->warning('Raw SQL output is currently supported for Postgres/MySQL only. Falling back to migrations.');
@@ -211,11 +213,11 @@ class EavSetupCommand extends Command
 
                 // Stamp header
                 $header = "-- EAV Setup SQL\n"
-                    . "-- connection: {$connectionName}\n"
+                    . "-- connection: $connectionName\n"
                     . "-- driver: " . get_class($driver) . "\n"
-                    . "-- pkType: {$pkType}\n"
-                    . "-- uuidType: {$uuidType}\n"
-                    . "-- jsonAttributeStorage: {$jsonStorage}\n"
+                    . "-- pkType: $pkType\n"
+                    . "-- uuidType: $uuidType\n"
+                    . "-- jsonAttributeStorage: $jsonStorage\n"
                     . "-- types: " . implode(',', $types) . "\n"
                     . "-- generatedAt: " . gmdate('c') . "\n\n";
                 $sql = $header . $sql;
@@ -245,7 +247,7 @@ class EavSetupCommand extends Command
                 if ($configPathOpt !== '') {
                     try {
                         $raw = file_get_contents($configPathOpt);
-                        $cfg = $raw !== false ? json_decode((string)$raw, true, 512, JSON_THROW_ON_ERROR) : null;
+                        $cfg = $raw !== false ? json_decode($raw, true, 512, JSON_THROW_ON_ERROR) : null;
                         if (is_array($cfg)) {
                             $cfg['rawSql'] = [
                                 'driver' => $isPg ? 'postgres' : 'mysql',
@@ -258,7 +260,7 @@ class EavSetupCommand extends Command
                                 $io->warning('Failed to update rawSql in config file: ' . $configPathOpt);
                             }
                         }
-                    } catch (\Throwable $e) {
+                    } catch (Throwable $e) {
                         $io->warning('Unable to update rawSql in config: ' . $e->getMessage());
                     }
                 }
@@ -279,11 +281,11 @@ class EavSetupCommand extends Command
         // Stamp a header summarizing the selections
         $header = "/**\n"
             . " * EAV Setup Migration\n"
-            . " * connection: {$connectionName}\n"
+            . " * connection: $connectionName\n"
             . " * driver: " . get_class($driver) . "\n"
-            . " * pkType: {$pkType}\n"
-            . " * uuidType: {$uuidType}\n"
-            . " * jsonAttributeStorage: {$jsonStorage}\n"
+            . " * pkType: $pkType\n"
+            . " * uuidType: $uuidType\n"
+            . " * jsonAttributeStorage: $jsonStorage\n"
             . " * types: " . implode(',', $types) . "\n"
             . " * generatedAt: " . gmdate('c') . "\n"
             . " */\n\n";
@@ -349,7 +351,7 @@ class EavSetupCommand extends Command
         // All = union of known map types + custom 'fk'
         $all = array_values(array_unique(array_merge(array_keys($this->typeMap), ['fk'])));
 
-        $arg = strtolower(trim((string)$typesArg));
+        $arg = strtolower(trim($typesArg));
         if ($arg === '' || $arg === 'defaults') {
             return $defaults;
         }
@@ -433,7 +435,7 @@ class EavSetupCommand extends Command
                 }
 
                 $tableSpecs[] = [
-                    'table' => "eav_{$tableType}",
+                    'table' => "eav_$tableType",
                     'valType' => $valType,
                     'valOptions' => $valOptions,
                 ];
@@ -443,7 +445,7 @@ class EavSetupCommand extends Command
             // Fallback for TypeFactory-known types not in $typeMap
             if (TypeFactory::getMap($type) !== null) {
                 $tableSpecs[] = [
-                    'table' => "eav_{$type}",
+                    'table' => "eav_$type",
                     'valType' => $type,
                     'valOptions' => [],
                 ];
@@ -453,7 +455,7 @@ class EavSetupCommand extends Command
         $specLines = [];
         foreach ($tableSpecs as $spec) {
             $options = var_export($spec['valOptions'], true);
-            $specLines[] = "            ['table' => '{$spec['table']}', 'valType' => '{$spec['valType']}', 'valOptions' => {$options}],";
+            $specLines[] = "            ['table' => '{$spec['table']}', 'valType' => '{$spec['valType']}', 'valOptions' => $options],";
         }
         $specBlock = implode("\n", $specLines);
         $className = Inflector::camelize($name);
@@ -464,13 +466,13 @@ declare(strict_types=1);
 
 use Migrations\BaseMigration;
 
-class {$className} extends BaseMigration
+class $className extends BaseMigration
 {
     public function change(): void
     {
         if (!\$this->hasTable('eav_attributes')) {
             \$this->table('eav_attributes', ['id' => false, 'primary_key' => ['id']])
-                ->addColumn('id', '{$uuidType}', ['null' => false])
+                ->addColumn('id', '$uuidType', ['null' => false])
                 ->addColumn('name', 'string', ['limit' => 255, 'null' => false])
                 ->addColumn('data_type', 'string', ['limit' => 50, 'null' => false])
                 ->addColumn('placeholder', 'string', ['limit' => 255, 'null' => true])
@@ -482,7 +484,7 @@ class {$className} extends BaseMigration
 
         if (!\$this->hasTable('eav_attribute_sets')) {
             \$this->table('eav_attribute_sets', ['id' => false, 'primary_key' => ['id']])
-                ->addColumn('id', '{$uuidType}', ['null' => false])
+                ->addColumn('id', '$uuidType', ['null' => false])
                 ->addColumn('name', 'string', ['limit' => 255, 'null' => false])
                 ->addTimestamps('created', 'modified')
                 ->addIndex(['name'], ['unique' => true, 'name' => 'idx_eav_attribute_sets_name'])
@@ -492,7 +494,7 @@ class {$className} extends BaseMigration
         // New: eav_entities registry table
         if (!\$this->hasTable('eav_entities')) {
             \$this->table('eav_entities', ['id' => false, 'primary_key' => ['id']])
-                ->addColumn('id', '{$uuidType}', ['null' => false])
+                ->addColumn('id', '$uuidType', ['null' => false])
                 ->addColumn('name', 'string', ['limit' => 255, 'null' => false])
                 ->addColumn('model_alias', 'string', ['limit' => 255, 'null' => true])
                 ->addColumn('table_name', 'string', ['limit' => 255, 'null' => true])
@@ -507,8 +509,8 @@ class {$className} extends BaseMigration
 
         if (!\$this->hasTable('eav_attribute_sets_eav_attributes')) {
             \$this->table('eav_attribute_sets_eav_attributes', ['id' => false, 'primary_key' => ['attribute_set_id', 'attribute_id']])
-                ->addColumn('attribute_set_id', '{$uuidType}', ['null' => false])
-                ->addColumn('attribute_id', '{$uuidType}', ['null' => false])
+                ->addColumn('attribute_set_id', '$uuidType', ['null' => false])
+                ->addColumn('attribute_id', '$uuidType', ['null' => false])
                 ->addColumn('position', 'integer', ['null' => true, 'default' => 0])
                 ->addForeignKey('attribute_set_id', 'eav_attribute_sets', 'id', ['delete' => 'CASCADE'])
                 ->addForeignKey('attribute_id', 'eav_attributes', 'id', ['delete' => 'CASCADE'])
@@ -524,11 +526,11 @@ class {$className} extends BaseMigration
                 continue;
             }
             // Composite PK across all installs (UUID or INT): (eav_entity_id, entity_id, eav_attribute_id)
-            \$table = \$this->table(\$spec['table'], ['id' => false, 'primary_key' => ['eav_entity_id', '{$entityField}', 'eav_attribute_id']]);
+            \$table = \$this->table(\$spec['table'], ['id' => false, 'primary_key' => ['eav_entity_id', '$entityField', 'eav_attribute_id']]);
             \$table
-                ->addColumn('eav_entity_id', '{$uuidType}', ['null' => false])
-                ->addColumn('{$entityField}', '{$entityFieldType}', ['null' => false])
-                ->addColumn('eav_attribute_id', '{$uuidType}', ['null' => false])
+                ->addColumn('eav_entity_id', '$uuidType', ['null' => false])
+                ->addColumn('$entityField', '$entityFieldType', ['null' => false])
+                ->addColumn('eav_attribute_id', '$uuidType', ['null' => false])
                 ->addColumn('value', \$spec['valType'], array_merge(\$spec['valOptions'], ['null' => true]))
                 ->addTimestamps('created', 'modified')
                 ->addForeignKey('eav_entity_id', 'eav_entities', 'id', ['delete' => 'CASCADE'])
@@ -564,7 +566,7 @@ PHP;
         $counter = 0;
         while (file_exists($base)) {
             $counter++;
-            $base = $path . '/' . $timestamp . '_' . Inflector::underscore($name) . "_{$counter}.php";
+            $base = $path . '/' . $timestamp . '_' . Inflector::underscore($name) . "_$counter.php";
         }
 
         return $base;
@@ -588,7 +590,7 @@ PHP;
         $counter = 0;
         while (file_exists($base)) {
             $counter++;
-            $base = $path . '/' . $timestamp . '_' . Inflector::underscore($name) . '_' . strtolower($driverTag) . "_{$counter}.sql";
+            $base = $path . '/' . $timestamp . '_' . Inflector::underscore($name) . '_' . strtolower($driverTag) . "_$counter.sql";
         }
 
         return $base;
@@ -613,8 +615,8 @@ PHP;
         array $types,
         object $driver
     ): string {
-        $isPg = $driver instanceof \Cake\Database\Driver\Postgres;
-        $isMy = $driver instanceof \Cake\Database\Driver\Mysql;
+        $isPg = $driver instanceof Postgres;
+        $isMy = $driver instanceof Mysql;
 
         // Vendor-specific type mappers
         $mapUuidCol = function (string $uuidType) use ($isPg, $isMy): string {
@@ -668,17 +670,17 @@ PHP;
         // EAV-29: Composite PK (eav_entity_id, entity_id, eav_attribute_id); no surrogate id; no separate unique index
         $emitTable = function (string $table, string $valueType) use ($idCol, $entityIdCol, $mapVarchar, $tsCol, $isPg): string {
             $lines = [];
-            $lines[] = "CREATE TABLE IF NOT EXISTS {$table} (";
-            $lines[] = "  eav_entity_id {$idCol} NOT NULL,";
-            $lines[] = "  entity_id {$entityIdCol} NOT NULL,";
-            $lines[] = "  eav_attribute_id {$idCol} NOT NULL,";
-            $lines[] = "  value {$valueType} NULL,";
-            $lines[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
-            $lines[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+            $lines[] = "CREATE TABLE IF NOT EXISTS $table (";
+            $lines[] = "  eav_entity_id $idCol NOT NULL,";
+            $lines[] = "  entity_id $entityIdCol NOT NULL,";
+            $lines[] = "  eav_attribute_id $idCol NOT NULL,";
+            $lines[] = "  value $valueType NULL,";
+            $lines[] = "  created $tsCol DEFAULT CURRENT_TIMESTAMP,";
+            $lines[] = "  modified $tsCol DEFAULT CURRENT_TIMESTAMP,";
             $lines[] = "  PRIMARY KEY (eav_entity_id, entity_id, eav_attribute_id)";
             $lines[] = ");";
-            $lines[] = "ALTER TABLE {$table} ADD CONSTRAINT fk_{$table}_eav_entity_id FOREIGN KEY (eav_entity_id) REFERENCES eav_entities(id) ON DELETE CASCADE;";
-            $lines[] = "ALTER TABLE {$table} ADD CONSTRAINT fk_{$table}_eav_attribute_id FOREIGN KEY (eav_attribute_id) REFERENCES eav_attributes(id) ON DELETE CASCADE;";
+            $lines[] = "ALTER TABLE $table ADD CONSTRAINT fk_{$table}_eav_entity_id FOREIGN KEY (eav_entity_id) REFERENCES eav_entities(id) ON DELETE CASCADE;";
+            $lines[] = "ALTER TABLE $table ADD CONSTRAINT fk_{$table}_eav_attribute_id FOREIGN KEY (eav_attribute_id) REFERENCES eav_attributes(id) ON DELETE CASCADE;";
             return implode("\n", $lines) . "\n";
         };
 
@@ -686,23 +688,23 @@ PHP;
         $ddl = [];
         $ddl[] = "-- Core attribute registry tables";
         $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attributes (";
-        $ddl[] = "  id {$idCol} NOT NULL,";
+        $ddl[] = "  id $idCol NOT NULL,";
         $ddl[] = "  name " . $mapVarchar(255) . " NOT NULL,";
         $ddl[] = "  data_type " . $mapVarchar(50) . " NOT NULL,";
         $ddl[] = "  placeholder " . $mapVarchar(255) . " NULL,";
         $ddl[] = "  help_text " . $mapVarchar(255) . " NULL,";
-        $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
-        $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  created $tsCol DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  modified $tsCol DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  PRIMARY KEY (id)";
         $ddl[] = ");";
         $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_attributes_name ON eav_attributes (name);";
         $ddl[] = "";
 
         $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attribute_sets (";
-        $ddl[] = "  id {$idCol} NOT NULL,";
+        $ddl[] = "  id $idCol NOT NULL,";
         $ddl[] = "  name " . $mapVarchar(255) . " NOT NULL,";
-        $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
-        $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  created $tsCol DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  modified $tsCol DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  PRIMARY KEY (id)";
         $ddl[] = ");";
         $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_attribute_sets_name ON eav_attribute_sets (name);";
@@ -710,7 +712,7 @@ PHP;
 
         // New: eav_entities registry table
         $ddl[] = "CREATE TABLE IF NOT EXISTS eav_entities (";
-        $ddl[] = "  id {$idCol} NOT NULL,";
+        $ddl[] = "  id $idCol NOT NULL,";
         $ddl[] = "  name " . $mapVarchar(255) . " NOT NULL,";
         $ddl[] = "  model_alias " . $mapVarchar(255) . " NULL,";
         $ddl[] = "  table_name " . $mapVarchar(255) . " NULL,";
@@ -718,16 +720,16 @@ PHP;
         $ddl[] = "  json_column " . $mapVarchar(255) . " NULL,";
         $ddl[] = "  pk_type " . $mapVarchar(10) . " NOT NULL,";
         $ddl[] = "  uuid_subtype " . $mapVarchar(20) . " NULL,";
-        $ddl[] = "  created {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
-        $ddl[] = "  modified {$tsCol} DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  created $tsCol DEFAULT CURRENT_TIMESTAMP,";
+        $ddl[] = "  modified $tsCol DEFAULT CURRENT_TIMESTAMP,";
         $ddl[] = "  PRIMARY KEY (id)";
         $ddl[] = ");";
         $ddl[] = "CREATE UNIQUE INDEX IF NOT EXISTS idx_eav_entities_name ON eav_entities (name);";
         $ddl[] = "";
 
         $ddl[] = "CREATE TABLE IF NOT EXISTS eav_attribute_sets_eav_attributes (";
-        $ddl[] = "  attribute_set_id {$idCol} NOT NULL,";
-        $ddl[] = "  attribute_id {$idCol} NOT NULL,";
+        $ddl[] = "  attribute_set_id $idCol NOT NULL,";
+        $ddl[] = "  attribute_id $idCol NOT NULL,";
         $ddl[] = "  position INTEGER DEFAULT 0,";
         $ddl[] = "  PRIMARY KEY (attribute_set_id, attribute_id)";
         $ddl[] = ");";

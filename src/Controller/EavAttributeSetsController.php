@@ -4,11 +4,14 @@ declare(strict_types=1);
 namespace Eav\Controller;
 
 use App\Controller\AppController;
+use Cake\Datasource\Exception\RecordNotFoundException;
+use Cake\Http\Response;
+use Eav\Model\Table\EavAttributeSetsTable;
 
 /**
  * EavAttributeSets Controller
  *
- * @property \Eav\Model\Table\EavAttributeSetsTable $EavAttributeSets
+ * @property EavAttributeSetsTable $EavAttributeSets
  */
 class EavAttributeSetsController extends AppController
 {
@@ -22,7 +25,7 @@ class EavAttributeSetsController extends AppController
     /**
      * Index method
      *
-     * @return \Cake\Http\Response|null|void Renders view
+     * @return void|null Renders view
      */
     public function index()
     {
@@ -36,8 +39,8 @@ class EavAttributeSetsController extends AppController
      * View method
      *
      * @param string|null $id Eav Attribute Set id.
-     * @return \Cake\Http\Response|null|void Renders view
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @return void|null Renders view
+     * @throws RecordNotFoundException When record not found.
      */
     public function view($id = null)
     {
@@ -48,7 +51,7 @@ class EavAttributeSetsController extends AppController
     /**
      * Add method
      *
-     * @return \Cake\Http\Response|null|void Redirects on successful add, renders view otherwise.
+     * @return Response|null|void Redirects on successful add, renders view otherwise.
      */
     public function add()
     {
@@ -70,8 +73,8 @@ class EavAttributeSetsController extends AppController
      * Edit method
      *
      * @param string|null $id Eav Attribute Set id.
-     * @return \Cake\Http\Response|null|void Redirects on successful edit, renders view otherwise.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @return Response|null|void Redirects on successful edit, renders view otherwise.
+     * @throws RecordNotFoundException When record not found.
      */
     public function edit($id = null)
     {
@@ -93,8 +96,8 @@ class EavAttributeSetsController extends AppController
      * Delete method
      *
      * @param string|null $id Eav Attribute Set id.
-     * @return \Cake\Http\Response|null Redirects to index.
-     * @throws \Cake\Datasource\Exception\RecordNotFoundException When record not found.
+     * @return Response|null Redirects to index.
+     * @throws RecordNotFoundException When record not found.
      */
     public function delete($id = null)
     {
